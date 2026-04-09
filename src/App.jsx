@@ -19,13 +19,13 @@ const categoryLabel = c => {
 };
 
 const MODEL = "claude-haiku-4-5-20251001";
-const SYS = "Du bist ein freundlicher Ernährungsberater. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
+const SYS = "Du bist ein strenger aber freundlicher FODMAP-Ernährungsberater nach Monash-Universität-Richtlinien. WICHTIG: Sei bei der Einstufung STRENG und KORREKT. Knoblauch, Zwiebeln, Weizen, Honig, Äpfel, Birnen, Wassermelone, Pilze, Blumenkohl sind IMMER high-FODMAP. Laktose-haltige Milchprodukte sind moderate bis high. Wenn auch nur EINE Zutat high-FODMAP ist, muss overall mindestens moderate sein. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
 const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz. Bei high: benenne das Hauptproblem und mach Mut dass es eine Lösung gibt. Bei low: bestätige dass alles gut ist.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien.","alternative":"Verträgliche Alternative oder null"}]}`;
 const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien.","alternative":"null oder Alternative"}]}`;
 const PROMPT_FIX = `Mach dieses Gericht FODMAP-verträglich. Zeige was getauscht wird. Einfache Sprache. NUR JSON:\n{"title":"Verträgliche Version","changes":[{"problem":"Problematische Zutat","solution":"Ersatz","why":"Kurzer Grund in einfacher Sprache"}],"summary":"1 ermutigender Satz was sich ändert"}`;
-const PROMPT_RECIPE = `Erstelle ein leckeres, einfaches FODMAP-armes Rezept passend zum Gericht. Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_RECIPE_FIXED = `Erstelle ein konkretes Rezept für die verträgliche Version dieses Gerichts mit den genannten Ersatz-Zutaten. Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_HUNGER = `Erstelle ein leckeres, einfaches FODMAP-armes Rezept basierend auf dem Wunsch des Nutzers. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_HUNGER = `Erstelle 3 verschiedene leckere FODMAP-arme Rezepte basierend auf dem Wunsch. Sei kreativ, variiere die Rezepte. Einfache Sprache. NUR JSON:\n{"recipes":[{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}]}`;
+const PROMPT_RECIPE = `Erstelle 3 verschiedene leckere FODMAP-arme Rezepte passend zum Gericht. Variiere die Rezepte. Einfache Sprache. NUR JSON:\n{"recipes":[{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}]}`;
+const PROMPT_RECIPE_FIXED = `Erstelle 3 verschiedene Rezepte für die verträgliche Version dieses Gerichts mit den genannten Ersatz-Zutaten. Variiere die Rezepte. Einfache Sprache. NUR JSON:\n{"recipes":[{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}]}`;
 
 function loadZXing() {
   return new Promise((resolve, reject) => {
@@ -134,7 +134,8 @@ export default function App() {
   const [loadMsg, setLoadMsg] = useState("");
   const [result, setResult] = useState(null);
   const [fix, setFix] = useState(null);
-  const [recipe, setRecipe] = useState(null);
+  const [recipe, setRecipe] = useState(null); // array of recipes
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [error, setError] = useState(null);
   const [fadeIn, setFadeIn] = useState(false);
   const [barcodeManual, setBarcodeManual] = useState("");
@@ -210,7 +211,7 @@ export default function App() {
 
   const loadRecipe = async (fromFix) => {
     setLoading(true); setError(null);
-    setLoadMsg("Rezept wird gezaubert ✨");
+    setLoadMsg("Rezepte werden gezaubert ✨");
     try {
       const dishName = result?.title || input;
       let prompt;
@@ -221,7 +222,8 @@ export default function App() {
         prompt = PROMPT_RECIPE + `\n\nDas Gericht: ${dishName}`;
       }
       const parsed = await callAI(prompt);
-      setRecipe(parsed); setStep("recipe"); fade();
+      const recipes = parsed.recipes || [parsed];
+      setRecipe(recipes); setSelectedRecipe(null); setStep("recipe"); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   };
@@ -230,10 +232,11 @@ export default function App() {
     const key = apiKey || import.meta.env.VITE_API_KEY;
     if (!key) { setShowSetup(true); return; }
     setLoading(true); setError(null); setStep("recipe"); setMode("hunger");
-    setLoadMsg("Rezept wird gezaubert ✨");
+    setLoadMsg("Rezepte werden gezaubert ✨");
     try {
       const parsed = await callAI(PROMPT_HUNGER + `\n\nDer Nutzer hat Hunger auf: ${hungerInput}`);
-      setRecipe(parsed); fade();
+      const recipes = parsed.recipes || [parsed];
+      setRecipe(recipes); setSelectedRecipe(null); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   };
@@ -247,7 +250,7 @@ export default function App() {
   };
 
   const reset = () => {
-    setInput(""); setHungerInput(""); setImage(null); setResult(null); setFix(null); setRecipe(null);
+    setInput(""); setHungerInput(""); setImage(null); setResult(null); setFix(null); setRecipe(null); setSelectedRecipe(null);
     setError(null); setMode(null); setStep("input"); setProductInfo(null); setBarcodeManual(""); setLoading(false);
     if (fileRef.current) fileRef.current.value = "";
   };
