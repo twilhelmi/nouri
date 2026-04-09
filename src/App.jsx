@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback } from "react";
 
-/* ── palette & helpers ── */
 const P = {
   bg: "#FAFAFA", surface: "#FFFFFF", surfaceAlt: "#F5F5F5",
-  text: "#1A1A1A", textSec: "#8E8E93", textTer: "#AEAEB2",
+  text: "#1A1A1A", textSec: "#6E6E73", textTer: "#AEAEB2",
   border: "#F2F2F7",
   green: "#34C759", greenBg: "#E8F9ED", greenBd: "#B8F0C8",
   amber: "#FF9500", amberBg: "#FFF4E0", amberBd: "#FFE0A3",
@@ -13,16 +12,29 @@ const P = {
 const colorOf = l => l === "low" ? P.green : l === "moderate" ? P.amber : P.red;
 const bgOf = l => l === "low" ? P.greenBg : l === "moderate" ? P.amberBg : P.redBg;
 const bdOf = l => l === "low" ? P.greenBd : l === "moderate" ? P.amberBd : P.redBd;
-const labelOf = l => l === "low" ? "Verträglich" : l === "moderate" ? "Vorsicht" : "Meiden";
-const emojiOf = l => l === "low" ? "✅" : l === "moderate" ? "⚠️" : "🚫";
+
+// Human-readable FODMAP category names
+const categoryLabel = c => {
+  if (!c || c === "keine") return null;
+  const map = {
+    "Fructose": "Fruchtzucker",
+    "Lactose": "Milchzucker",
+    "Fructane": "Schwer verdauliche Ballaststoffe",
+    "GOS": "Hülsenfrucht-Zucker",
+    "Polyole": "Zuckeralkohole",
+    "GOS/Fructane": "Ballaststoffe & Hülsenfrucht-Zucker",
+    "Fructose/Polyole": "Fruchtzucker & Zuckeralkohole",
+  };
+  return map[c] || c;
+};
 
 const MODEL = "claude-haiku-4-5-20251001";
-const PROMPT_CHECK = `FODMAP-Experte (Monash). Analysiere das Essen. NUR JSON:\n{"title":"Name","overall":"low/moderate/high","summary":"2 Sätze DE","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","note":"Hinweis DE","alternative":"Alternative oder null"}],"tip":"SIBO-Tipp DE","safe_version":"FODMAP-arm Umbau oder null"}`;
-const PROMPT_LABEL = `FODMAP-Experte. Analysiere diese Zutatenliste/Label. Suche ALLE problematischen Stoffe (Fructose, Lactose, Fructane, GOS, Polyole, Inulin, Sorbitol, Mannitol, Xylitol, Zwiebel, Knoblauch). NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"2 Sätze DE","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","note":"Hinweis DE","alternative":"null oder Alternative"}],"tip":"Tipp DE","safe_version":"Bessere Alternative oder null"}`;
-const PROMPT_RECIPE = `Kreativer FODMAP-Koch. Erstelle ein leckeres, einfaches FODMAP-armes Rezept basierend auf dem Gericht. NUR JSON:\n{"title":"Rezeptname","description":"1 Satz was das Rezept besonders macht DE","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Extra-Tipp DE"}`;
-const PROMPT_FIX = `Kreativer FODMAP-Koch. Mach dieses Gericht FODMAP-arm. Ersetze problematische Zutaten durch verträgliche Alternativen. Gib ein konkretes Rezept. NUR JSON:\n{"title":"Verträgliche Version: Rezeptname","description":"1 Satz was anders ist DE","changes":[{"problem":"Problematische Zutat","solution":"Ersatz-Zutat","why":"Kurze Begründung DE"}],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Extra-Tipp DE"}`;
+const SYS = "Du bist ein freundlicher Ernährungsberater. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
+const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz der das Ergebnis zusammenfasst. Bei high: benenne das Hauptproblem und mach Mut dass es eine Lösung gibt. Bei low: bestätige dass alles gut ist.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien: warum ist das problematisch oder warum ist es okay? Keine Fachbegriffe.","alternative":"Verträgliche Alternative oder null"}]}`;
+const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. Suche ALLE problematischen Stoffe. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien.","alternative":"null oder Alternative"}]}`;
+const PROMPT_RECIPE = `Erstelle ein leckeres, einfaches FODMAP-armes Rezept passend zum Gericht. Schreib für Laien, einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_FIX = `Mach dieses Gericht FODMAP-verträglich. Ersetze problematische Zutaten. Einfache Sprache für Laien. NUR JSON:\n{"title":"Rezeptname","description":"1 Satz was anders ist","changes":[{"problem":"Problematische Zutat","solution":"Ersatz","why":"Kurzer Grund in einfacher Sprache"}],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 
-/* ── ZXing loader ── */
 function loadZXing() {
   return new Promise((resolve, reject) => {
     if (window.ZXing) { resolve(window.ZXing); return; }
@@ -34,28 +46,18 @@ function loadZXing() {
   });
 }
 
-/* ── Barcode Scanner ── */
 function BarcodeScanner({ onDetect, onClose }) {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
   const [status, setStatus] = useState("starting");
   const [error, setError] = useState(null);
-
   const handleClose = useCallback(() => {
     if (readerRef.current) { try { readerRef.current.reset(); } catch {} }
     onClose();
   }, [onClose]);
-
-  const startRef = useRef(false);
-  const useState2 = useState;
-  
-  if (!startRef.current) {
-    startRef.current = true;
-  }
-
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000", display: "flex", flexDirection: "column" }}>
-      <ScannerInner videoRef={videoRef} readerRef={readerRef} onDetect={onDetect} setStatus={setStatus} setError={setError} />
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000" }}>
+      <ScannerEngine videoRef={videoRef} readerRef={readerRef} onDetect={onDetect} setStatus={setStatus} setError={setError} />
       <video ref={videoRef} autoPlay playsInline muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       {status === "scanning" && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
@@ -67,15 +69,14 @@ function BarcodeScanner({ onDetect, onClose }) {
           ? <div style={{ color: "#fca5a5", fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: "inherit" }}>{error}</div>
           : <div style={{ color: "rgba(255,255,255,.7)", fontSize: 14, fontWeight: 500, marginBottom: 16, fontFamily: "inherit" }}>
               {status === "starting" ? "Wird geladen…" : "Barcode in den Rahmen halten"}
-            </div>
-        }
+            </div>}
         <button onClick={handleClose} style={{ padding: "12px 40px", borderRadius: 100, border: "none", background: "rgba(255,255,255,.15)", backdropFilter: "blur(20px)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Abbrechen</button>
       </div>
     </div>
   );
 }
 
-function ScannerInner({ videoRef, readerRef, onDetect, setStatus, setError }) {
+function ScannerEngine({ videoRef, readerRef, onDetect, setStatus, setError }) {
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
@@ -83,82 +84,91 @@ function ScannerInner({ videoRef, readerRef, onDetect, setStatus, setError }) {
       try {
         const ZXing = await loadZXing();
         const hints = new Map();
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-          ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-          ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-          ZXing.BarcodeFormat.CODE_128,
-        ]);
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.CODE_128]);
         const reader = new ZXing.BrowserMultiFormatReader(hints);
         readerRef.current = reader;
         setStatus("scanning");
-        await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
-          videoRef.current,
-          (result) => {
-            if (result) {
-              if (navigator.vibrate) navigator.vibrate(100);
-              try { reader.reset(); } catch {}
-              onDetect(result.getText());
-            }
-          }
-        );
-      } catch (e) {
-        setError(e?.name === "NotAllowedError"
-          ? "Kamera-Zugriff verweigert."
-          : "Kamera konnte nicht gestartet werden.");
-        setStatus("error");
-      }
+        await reader.decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current, (result) => {
+          if (result) { if (navigator.vibrate) navigator.vibrate(100); try { reader.reset(); } catch {} onDetect(result.getText()); }
+        });
+      } catch (e) { setError(e?.name === "NotAllowedError" ? "Kamera-Zugriff verweigert." : "Kamera konnte nicht gestartet werden."); setStatus("error"); }
     }, 0);
   }
   return null;
 }
 
-/* ── Reusable Components ── */
-const Card = ({ children, style }) => (
-  <div style={{ background: P.surface, borderRadius: P.radius, padding: 20, ...style }}>{children}</div>
-);
+/* ── Components ── */
+const Card = ({ children, style }) => <div style={{ background: P.surface, borderRadius: P.radius, padding: 20, ...style }}>{children}</div>;
 
-const ActionButton = ({ children, onClick, disabled, variant = "primary", style }) => (
+const Btn = ({ children, onClick, disabled, variant = "primary", style }) => (
   <button onClick={onClick} disabled={disabled} style={{
     width: "100%", padding: "16px", borderRadius: 100, border: "none",
-    background: disabled ? P.surfaceAlt : variant === "primary" ? P.text : P.surfaceAlt,
-    color: disabled ? P.textTer : variant === "primary" ? "#fff" : P.text,
-    fontSize: 16, fontWeight: 700, cursor: disabled ? "default" : "pointer",
-    fontFamily: "inherit", transition: "all .2s", ...style,
-  }}>{children}</button>
-);
-
-const MagicButton = ({ children, onClick, disabled, style }) => (
-  <button onClick={onClick} disabled={disabled} style={{
-    width: "100%", padding: "16px", borderRadius: 100, border: "none",
-    background: disabled ? P.surfaceAlt : "linear-gradient(135deg, #34C759, #30B350)",
-    color: disabled ? P.textTer : "#fff",
+    background: disabled ? P.surfaceAlt : variant === "magic" ? "linear-gradient(135deg, #34C759, #30B350)" : variant === "primary" ? P.text : P.surfaceAlt,
+    color: disabled ? P.textTer : variant === "secondary" ? P.text : "#fff",
     fontSize: 16, fontWeight: 700, cursor: disabled ? "default" : "pointer",
     fontFamily: "inherit", transition: "all .2s",
-    boxShadow: disabled ? "none" : "0 4px 14px rgba(52,199,89,.35)",
+    boxShadow: variant === "magic" && !disabled ? "0 4px 14px rgba(52,199,89,.3)" : "none",
     ...style,
   }}>{children}</button>
 );
 
-const InputModeCard = ({ icon, title, sub, onClick }) => (
+const ModeCard = ({ icon, title, sub, onClick }) => (
   <button onClick={onClick} style={{
     flex: 1, padding: "22px 12px 18px", borderRadius: P.radius, border: `1.5px solid ${P.border}`,
     background: P.surface, cursor: "pointer", textAlign: "center", display: "flex",
-    flexDirection: "column", alignItems: "center", gap: 4, transition: "all .15s",
-    fontFamily: "inherit",
+    flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit",
   }}>
-    <span style={{ fontSize: 30, lineHeight: 1 }}>{icon}</span>
+    <span style={{ fontSize: 30 }}>{icon}</span>
     <span style={{ fontSize: 14, fontWeight: 700, color: P.text, marginTop: 6 }}>{title}</span>
-    <span style={{ fontSize: 12, color: P.textTer, lineHeight: 1.3 }}>{sub}</span>
+    <span style={{ fontSize: 12, color: P.textTer }}>{sub}</span>
   </button>
 );
 
-/* ── Main App ── */
+/* ── Expandable Ingredient Row ── */
+function IngredientRow({ it, last }) {
+  const [open, setOpen] = useState(false);
+  const isOk = it.fodmap === "low";
+  const catLabel = categoryLabel(it.category);
+  return (
+    <div style={{ borderBottom: last ? "none" : `1px solid ${P.border}` }}>
+      <button onClick={() => !isOk && setOpen(!open)} style={{
+        width: "100%", padding: "14px 0", background: "none", border: "none", cursor: isOk ? "default" : "pointer",
+        display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit", textAlign: "left",
+      }}>
+        <div style={{
+          width: 10, height: 10, borderRadius: 5, background: colorOf(it.fodmap), flexShrink: 0,
+        }} />
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 500, color: P.text }}>{it.name}</span>
+        {!isOk && (
+          <span style={{ fontSize: 13, color: P.textTer, transition: "transform .2s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>▾</span>
+        )}
+        {isOk && <span style={{ fontSize: 13, color: P.green }}>✓</span>}
+      </button>
+      {open && !isOk && (
+        <div style={{ padding: "0 0 14px 22px", animation: "fadeUp .2s ease-out" }}>
+          {catLabel && (
+            <div style={{
+              display: "inline-block", fontSize: 11, fontWeight: 600,
+              background: bgOf(it.fodmap), color: colorOf(it.fodmap),
+              padding: "3px 10px", borderRadius: 6, marginBottom: 8,
+            }}>{catLabel}</div>
+          )}
+          {it.detail && <div style={{ fontSize: 13, color: P.textSec, lineHeight: 1.5, marginBottom: it.alternative ? 8 : 0 }}>{it.detail}</div>}
+          {it.alternative && (
+            <div style={{ fontSize: 13, color: P.green, fontWeight: 500 }}>→ {it.alternative}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── App ── */
 export default function App() {
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY || "");
   const [showSetup, setShowSetup] = useState(false);
-  const [mode, setMode] = useState(null); // null | "text" | "barcode" | "photo-result" | "barcode-result"
-  const [step, setStep] = useState("input"); // "input" | "result" | "recipe"
+  const [mode, setMode] = useState(null);
+  const [step, setStep] = useState("input");
   const [input, setInput] = useState("");
   const [image, setImage] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -178,7 +188,7 @@ export default function App() {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1500, messages: [{ role: "user", content }] })
+      body: JSON.stringify({ model: MODEL, max_tokens: 1500, system: SYS, messages: [{ role: "user", content }] })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
@@ -188,7 +198,7 @@ export default function App() {
     return JSON.parse(m[0]);
   }, [apiKey]);
 
-  const showRes = (parsed) => { setResult(parsed); setStep("result"); setFadeIn(true); setTimeout(() => setFadeIn(false), 500); };
+  const fade = () => { setFadeIn(true); setTimeout(() => setFadeIn(false), 500); };
 
   const analyze = async (promptOverride, imgOverride) => {
     const key = apiKey || import.meta.env.VITE_API_KEY;
@@ -202,10 +212,9 @@ export default function App() {
       if (img) {
         const b = img.split(",")[1], mt = img.split(";")[0].split(":")[1];
         content = [{ type: "image", source: { type: "base64", media_type: mt, data: b } }, { type: "text", text: prompt }];
-      } else {
-        content = prompt + "\n\nDas Essen: " + input;
-      }
-      showRes(await callAI(content));
+      } else { content = prompt + "\n\nDas Essen: " + input; }
+      const parsed = await callAI(content);
+      setResult(parsed); setStep("result"); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   };
@@ -221,9 +230,10 @@ export default function App() {
       const ingredients = p.ingredients_text_de || p.ingredients_text || "";
       const nutri = p.nutriscore_grade ? `Nutriscore ${p.nutriscore_grade.toUpperCase()}` : "";
       setProductInfo({ name, code, image: p.image_front_small_url, ingredients, nutri });
-      setLoadMsg("FODMAP-Analyse läuft…");
+      setLoadMsg("Wird analysiert…");
       const prompt = PROMPT_LABEL + `\n\nProdukt: ${name}\nZutaten: ${ingredients}\n${nutri}`;
-      showRes(await callAI(prompt));
+      const parsed = await callAI(prompt);
+      setResult(parsed); setStep("result"); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   }, [apiKey, callAI]);
@@ -238,7 +248,7 @@ export default function App() {
         ? PROMPT_RECIPE + `\n\nDas Gericht: ${dishName}`
         : PROMPT_FIX + `\n\nDas Gericht: ${dishName}\nProblematische Zutaten: ${result?.items?.filter(i => i.fodmap !== "low").map(i => i.name).join(", ")}`;
       const parsed = await callAI(prompt);
-      setRecipe(parsed); setStep("recipe"); setFadeIn(true); setTimeout(() => setFadeIn(false), 500);
+      setRecipe(parsed); setStep("recipe"); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   };
@@ -253,78 +263,26 @@ export default function App() {
 
   const reset = () => {
     setInput(""); setImage(null); setResult(null); setRecipe(null);
-    setError(null); setMode(null); setStep("input"); setProductInfo(null); setBarcodeManual("");
+    setError(null); setMode(null); setStep("input"); setProductInfo(null); setBarcodeManual(""); setLoading(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const backToResult = () => { setStep("result"); setRecipe(null); setError(null); setLoading(false); };
-
-  /* ── Sub-Components ── */
-  const ResultBadge = ({ overall }) => (
-    <div style={{
-      background: bgOf(overall), border: `1.5px solid ${bdOf(overall)}`,
-      borderRadius: P.radius, padding: "16px 18px",
-      display: "flex", alignItems: "center", gap: 14,
-    }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: 14, background: colorOf(overall),
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 22, color: "#fff", fontWeight: 800, flexShrink: 0,
-      }}>
-        {overall === "low" ? "✓" : overall === "moderate" ? "!" : "✕"}
-      </div>
-      <div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: colorOf(overall) }}>{labelOf(overall)}</div>
-        <div style={{ fontSize: 12, color: P.textSec, marginTop: 2 }}>FODMAP-Gehalt: {overall === "low" ? "niedrig" : overall === "moderate" ? "mittel" : "hoch"}</div>
-      </div>
-    </div>
-  );
-
-  const ItemRow = ({ it, last }) => (
-    <div style={{ padding: "14px 0", borderBottom: last ? "none" : `1px solid ${P.border}` }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, background: bgOf(it.fodmap),
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0,
-        }}>{emojiOf(it.fodmap)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{it.name}</span>
-            {it.category && it.category !== "keine" && (
-              <span style={{
-                fontSize: 10, fontWeight: 700, background: bgOf(it.fodmap), color: colorOf(it.fodmap),
-                padding: "3px 8px", borderRadius: 6, textTransform: "uppercase", letterSpacing: .3, whiteSpace: "nowrap",
-              }}>{it.category}</span>
-            )}
-          </div>
-          {it.note && <div style={{ fontSize: 13, color: P.textSec, marginTop: 3, lineHeight: 1.5 }}>{it.note}</div>}
-          {it.alternative && (
-            <div style={{
-              fontSize: 13, marginTop: 6, background: P.greenBg, border: `1px solid ${P.greenBd}`,
-              borderRadius: 10, padding: "8px 10px", color: P.green, lineHeight: 1.4, fontWeight: 500,
-            }}>→ {it.alternative}</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
+  /* ── Render ── */
   return (
     <div style={{ minHeight: "100vh", background: P.bg, color: P.text, fontFamily: "SF Pro Display, -apple-system, 'Helvetica Neue', sans-serif", maxWidth: 480, margin: "0 auto", paddingBottom: 40 }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
-        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        .fade-in { animation: fadeUp .3s ease-out }
-        input:focus, textarea:focus { border-color: ${P.text} !important; outline: none; }
-        ::placeholder { color: ${P.textTer}; }
-        * { -webkit-tap-highlight-color: transparent; }
-        button:active { opacity: .7; }
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-in{animation:fadeUp .3s ease-out}
+        input:focus,textarea:focus{border-color:${P.text}!important;outline:none}
+        ::placeholder{color:${P.textTer}}
+        *{-webkit-tap-highlight-color:transparent}
+        button:active{opacity:.7}
       `}</style>
 
       {scanning && <BarcodeScanner onDetect={onBarcode} onClose={() => setScanning(false)} />}
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{ padding: "24px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <button onClick={reset} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "baseline", gap: 2 }}>
           <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: -.8, color: P.text }}>nouri</span>
@@ -337,12 +295,11 @@ export default function App() {
         }}>⚙</button>
       </div>
 
-      {/* API Key Setup */}
       {showSetup && (
         <div style={{ padding: "12px 20px 0" }}>
           <Card>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>API Key</div>
-            <div style={{ fontSize: 13, color: P.textSec, marginBottom: 12, lineHeight: 1.4 }}>Dein Anthropic API Key für die AI-Analyse.</div>
+            <div style={{ fontSize: 13, color: P.textSec, marginBottom: 12 }}>Dein Anthropic API Key.</div>
             <input value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-ant-..." type="password"
               style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "12px 14px", color: P.text, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }} />
             {apiKey && <div style={{ fontSize: 12, color: P.green, marginTop: 8, fontWeight: 600 }}>✓ Verbunden</div>}
@@ -352,202 +309,175 @@ export default function App() {
 
       <div style={{ padding: "0 20px" }}>
 
-        {/* ── STEP 1: INPUT ── */}
+        {/* ═══ INPUT ═══ */}
         {step === "input" && (
-          <div>
-            {/* Hero */}
+          <>
             {!mode && !loading && (
               <div style={{ paddingTop: 24 }}>
                 <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: -.5 }}>Iss, was dir<br/>gut tut.</div>
-                <div style={{ fontSize: 14, color: P.textSec, marginTop: 6, marginBottom: 24 }}>Finde heraus, ob dein Essen verträglich ist — und wenn nicht, machen wir's besser.</div>
+                <div style={{ fontSize: 15, color: P.textSec, marginTop: 8, marginBottom: 28, lineHeight: 1.5 }}>Finde heraus, ob dein Essen verträglich ist.</div>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <InputModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
-                  <InputModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
-                  <InputModeCard icon="📦" title="Barcode" sub="Produkt scannen" onClick={() => setMode("barcode")} />
+                  <ModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
+                  <ModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
+                  <ModeCard icon="📦" title="Barcode" sub="Produkt scannen" onClick={() => setMode("barcode")} />
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImg(PROMPT_CHECK)} style={{ display: "none" }} />
               </div>
             )}
 
-            {/* Text Input */}
             {mode === "text" && !loading && (
               <Card style={{ marginTop: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <button onClick={() => setMode(null)} style={{
-                    width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`,
-                    background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>←</button>
+                  <button onClick={() => setMode(null)} style={{ width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`, background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 700 }}>Gericht beschreiben</div>
                     <div style={{ fontSize: 13, color: P.textSec }}>Was möchtest du essen?</div>
                   </div>
                 </div>
-                <textarea value={input} onChange={e => setInput(e.target.value)}
-                  placeholder={"z.B. Pasta mit Knoblauch und Sahnesauce\noder: Apfel, Joghurt, Honig"} rows={3}
+                <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={"z.B. Pasta mit Knoblauch und Sahnesauce"} rows={3}
                   style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", lineHeight: 1.5, marginBottom: 14 }} />
-                <ActionButton onClick={() => analyze()} disabled={!input.trim()}>Verträglichkeit prüfen</ActionButton>
+                <Btn onClick={() => analyze()} disabled={!input.trim()}>Prüfen</Btn>
               </Card>
             )}
 
-            {/* Barcode Input */}
             {mode === "barcode" && !loading && (
               <Card style={{ marginTop: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-                  <button onClick={() => setMode(null)} style={{
-                    width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`,
-                    background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>←</button>
+                  <button onClick={() => setMode(null)} style={{ width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`, background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 700 }}>Produkt scannen</div>
                     <div style={{ fontSize: 13, color: P.textSec }}>Barcode auf der Verpackung</div>
                   </div>
                 </div>
-                <ActionButton onClick={() => setScanning(true)}>Kamera öffnen</ActionButton>
+                <Btn onClick={() => setScanning(true)}>Kamera öffnen</Btn>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
                   <div style={{ flex: 1, height: 1, background: P.border }} />
                   <span style={{ fontSize: 12, color: P.textTer, fontWeight: 500 }}>oder manuell</span>
                   <div style={{ flex: 1, height: 1, background: P.border }} />
                 </div>
-                <input value={barcodeManual} onChange={e => setBarcodeManual(e.target.value.replace(/\D/g, ""))}
-                  placeholder="EAN-Nummer eingeben" inputMode="numeric"
+                <input value={barcodeManual} onChange={e => setBarcodeManual(e.target.value.replace(/\D/g, ""))} placeholder="EAN-Nummer eingeben" inputMode="numeric"
                   style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 12 }} />
-                <ActionButton onClick={() => barcodeManual.length >= 8 && onBarcode(barcodeManual)} disabled={barcodeManual.length < 8}>Produkt suchen</ActionButton>
+                <Btn onClick={() => barcodeManual.length >= 8 && onBarcode(barcodeManual)} disabled={barcodeManual.length < 8}>Suchen</Btn>
               </Card>
             )}
-          </div>
+          </>
         )}
 
-        {/* ── Loading (shared) ── */}
+        {/* Loading */}
         {loading && (
-          <Card style={{ textAlign: "center", padding: "40px 20px", marginTop: 16 }}>
+          <Card style={{ textAlign: "center", padding: "48px 20px", marginTop: 16 }}>
             {productInfo?.image && <img src={productInfo.image} alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover", margin: "0 auto 14px", display: "block" }} />}
-            <div style={{ width: 32, height: 32, margin: "0 auto 14px", border: `3px solid ${P.border}`, borderTopColor: P.green, borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+            <div style={{ width: 32, height: 32, margin: "0 auto 16px", border: `3px solid ${P.border}`, borderTopColor: P.green, borderRadius: "50%", animation: "spin .7s linear infinite" }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: P.textSec }}>{loadMsg}</div>
-            {productInfo && <div style={{ fontSize: 13, color: P.textTer, marginTop: 4 }}>{productInfo.name}</div>}
           </Card>
         )}
 
-        {/* ── Error (shared) ── */}
+        {/* Error */}
         {error && !loading && (
-          <div style={{ background: P.redBg, border: `1px solid ${P.redBd}`, borderRadius: P.radius, padding: "16px", fontSize: 14, color: P.red, lineHeight: 1.5, marginTop: 16 }}>
+          <div style={{ background: P.redBg, border: `1px solid ${P.redBd}`, borderRadius: P.radius, padding: 16, fontSize: 14, color: P.red, lineHeight: 1.5, marginTop: 16 }}>
             {error}
             <div onClick={reset} style={{ marginTop: 10, fontSize: 13, fontWeight: 600, textDecoration: "underline", cursor: "pointer" }}>Nochmal versuchen</div>
           </div>
         )}
 
-        {/* ── STEP 2: RESULT ── */}
+        {/* ═══ RESULT ═══ */}
         {step === "result" && result && !loading && (
           <div className={fadeIn ? "fade-in" : ""} style={{ paddingTop: 16 }}>
+
+            {/* Product info if scanned */}
             {productInfo && (
-              <Card style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
-                {productInfo.image && <img src={productInfo.image} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} />}
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: P.textTer, fontWeight: 600, textTransform: "uppercase", letterSpacing: .5 }}>Gescannt</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productInfo.name}</div>
-                  {productInfo.nutri && <div style={{ fontSize: 12, color: P.textSec, marginTop: 1 }}>{productInfo.nutri} · EAN {productInfo.code}</div>}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                {productInfo.image && <img src={productInfo.image} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />}
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{productInfo.name}</div>
+                  {productInfo.nutri && <div style={{ fontSize: 12, color: P.textTer }}>{productInfo.nutri}</div>}
                 </div>
-              </Card>
+              </div>
             )}
+
+            {/* Photo if taken */}
             {image && !productInfo && (
-              <div style={{ marginBottom: 12 }}>
-                <img src={image} alt="" style={{ width: "100%", borderRadius: P.radius, maxHeight: 180, objectFit: "cover" }} />
-              </div>
-            )}
-            <Card style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 14 }}>{result.title}</div>
-              <ResultBadge overall={result.overall} />
-              {result.summary && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.6, marginTop: 16 }}>{result.summary}</div>}
-            </Card>
-            <Card style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 8 }}>Einzelne Zutaten</div>
-              {result.items?.map((it, i) => <ItemRow key={i} it={it} last={i === result.items.length - 1} />)}
-            </Card>
-
-            {result.safe_version && result.overall !== "low" && (
-              <div style={{ background: P.greenBg, borderRadius: P.radius, padding: 16, border: `1px solid ${P.greenBd}`, marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>💡 So wird's verträglich</div>
-                <div style={{ fontSize: 13, color: P.text, lineHeight: 1.6 }}>{result.safe_version}</div>
-              </div>
-            )}
-            {result.tip && (
-              <div style={{ background: P.amberBg, borderRadius: P.radius, padding: 16, border: `1px solid ${P.amberBd}`, marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: P.amber, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>🧠 Gut zu wissen</div>
-                <div style={{ fontSize: 13, color: P.text, lineHeight: 1.6 }}>{result.tip}</div>
+              <div style={{ marginBottom: 16 }}>
+                <img src={image} alt="" style={{ width: "100%", borderRadius: P.radius, maxHeight: 160, objectFit: "cover" }} />
               </div>
             )}
 
-            {/* ── Magic CTA ── */}
-            <div style={{ marginTop: 8 }}>
-              <MagicButton onClick={loadRecipe}>
-                {result.overall === "low" ? "Rezept anzeigen 🪄" : "Verträglich machen 🪄"}
-              </MagicButton>
-            </div>
-            <ActionButton onClick={reset} variant="secondary" style={{ marginTop: 8 }}>Neuer Check</ActionButton>
+            {/* Verdict */}
+            <Card style={{ marginBottom: 12, borderLeft: `4px solid ${colorOf(result.overall)}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{result.title}</div>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: bgOf(result.overall), padding: "8px 14px", borderRadius: 100,
+                marginBottom: result.summary ? 14 : 0,
+              }}>
+                <div style={{ width: 10, height: 10, borderRadius: 5, background: colorOf(result.overall) }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: colorOf(result.overall) }}>
+                  {result.overall === "low" ? "Verträglich" : result.overall === "moderate" ? "Vorsicht" : "Nicht verträglich"}
+                </span>
+              </div>
+              {result.summary && <div style={{ fontSize: 15, color: P.textSec, lineHeight: 1.6 }}>{result.summary}</div>}
+            </Card>
+
+            {/* Ingredients — tap to expand */}
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 4 }}>Zutaten</div>
+              <div style={{ fontSize: 12, color: P.textTer, marginBottom: 12 }}>Tippe auf eine Zutat für Details</div>
+              {result.items?.map((it, i) => <IngredientRow key={i} it={it} last={i === result.items.length - 1} />)}
+            </Card>
+
+            {/* Magic CTA */}
+            <Btn variant="magic" onClick={loadRecipe} style={{ marginBottom: 8 }}>
+              {result.overall === "low" ? "Rezept anzeigen 🪄" : "Verträglich machen 🪄"}
+            </Btn>
+            <Btn variant="secondary" onClick={reset}>Neuer Check</Btn>
           </div>
         )}
 
-        {/* ── STEP 3: RECIPE ── */}
+        {/* ═══ RECIPE ═══ */}
         {step === "recipe" && recipe && !loading && (
           <div className={fadeIn ? "fade-in" : ""} style={{ paddingTop: 16 }}>
             <Card style={{ marginBottom: 12, border: `1.5px solid ${P.greenBd}` }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>
                 {result?.overall === "low" ? "✨ Rezeptvorschlag" : "✨ Verträgliche Version"}
               </div>
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{recipe.title}</div>
-              {recipe.description && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.5, marginBottom: 14 }}>{recipe.description}</div>}
+              {recipe.description && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.5, marginBottom: 16 }}>{recipe.description}</div>}
 
-              <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-                {recipe.servings && (
-                  <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>
-                    👤 {recipe.servings} Portionen
-                  </div>
-                )}
-                {recipe.time && (
-                  <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>
-                    ⏱ {recipe.time}
-                  </div>
-                )}
+              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                {recipe.servings && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>👤 {recipe.servings} Portionen</div>}
+                {recipe.time && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>⏱ {recipe.time}</div>}
               </div>
 
-              {/* Changes (for fix recipes) */}
-              {recipe.changes && recipe.changes.length > 0 && (
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 10 }}>Was wir geändert haben</div>
+              {recipe.changes?.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 10 }}>Was wir geändert haben</div>
                   {recipe.changes.map((c, i) => (
-                    <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                      <div style={{ flex: 1, background: P.redBg, borderRadius: 10, padding: "8px 10px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: P.red, textTransform: "uppercase", marginBottom: 2 }}>Raus</div>
-                        <div style={{ fontSize: 13, color: P.textSec }}>{c.problem}</div>
+                    <div key={i} style={{ background: P.surfaceAlt, borderRadius: 12, padding: 12, marginBottom: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                        <span style={{ color: P.red, textDecoration: "line-through" }}>{c.problem}</span>
+                        <span style={{ color: P.textTer, margin: "0 8px" }}>→</span>
+                        <span style={{ color: P.green }}>{c.solution}</span>
                       </div>
-                      <div style={{ flex: 1, background: P.greenBg, borderRadius: 10, padding: "8px 10px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: P.green, textTransform: "uppercase", marginBottom: 2 }}>Rein</div>
-                        <div style={{ fontSize: 13, color: P.textSec }}>{c.solution}</div>
-                      </div>
+                      {c.why && <div style={{ fontSize: 12, color: P.textSec }}>{c.why}</div>}
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Ingredients */}
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 10 }}>Zutaten</div>
-              <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 10 }}>Zutaten</div>
+              <div style={{ marginBottom: 20 }}>
                 {recipe.ingredients?.map((ing, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < recipe.ingredients.length - 1 ? `1px solid ${P.border}` : "none" }}>
                     <div style={{ width: 6, height: 6, borderRadius: 3, background: P.green, flexShrink: 0 }} />
-                    <span style={{ fontSize: 14, color: P.text }}>{ing}</span>
+                    <span style={{ fontSize: 14 }}>{ing}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Steps */}
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 10 }}>Zubereitung</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 10 }}>Zubereitung</div>
               {recipe.steps?.map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 14, background: P.surfaceAlt,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, fontWeight: 700, color: P.textSec, flexShrink: 0,
-                  }}>{i + 1}</div>
+                  <div style={{ width: 28, height: 28, borderRadius: 14, background: P.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: P.textSec, flexShrink: 0 }}>{i + 1}</div>
                   <div style={{ fontSize: 14, color: P.text, lineHeight: 1.6, paddingTop: 3 }}>{s}</div>
                 </div>
               ))}
@@ -559,16 +489,13 @@ export default function App() {
               )}
             </Card>
 
-            <ActionButton onClick={backToResult} variant="secondary" style={{ marginTop: 4 }}>← Zurück zum Check</ActionButton>
-            <ActionButton onClick={reset} variant="secondary" style={{ marginTop: 8 }}>Neuer Check</ActionButton>
+            <Btn variant="secondary" onClick={() => { setStep("result"); setRecipe(null); setError(null); }} style={{ marginBottom: 8 }}>← Zurück</Btn>
+            <Btn variant="secondary" onClick={reset}>Neuer Check</Btn>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div style={{ textAlign: "center", fontSize: 11, color: P.textTer, marginTop: 32, padding: "0 20px", lineHeight: 1.5 }}>
-        Kein Ersatz für ärztliche Beratung
-      </div>
+      <div style={{ textAlign: "center", fontSize: 11, color: P.textTer, marginTop: 32, padding: "0 20px" }}>Kein Ersatz für ärztliche Beratung</div>
     </div>
   );
 }
