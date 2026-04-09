@@ -336,19 +336,37 @@ export default function App() {
       )}
 
       {/* ── Navigation ── */}
-      <div style={{ display: "flex", gap: 0, padding: "20px 20px 0" }}>
-        {[
-          ["check", "Verträglich?"],
-          ["swap", "Besser machen"],
-        ].map(([k, l]) => (
-          <button key={k} onClick={() => { setTab(k); reset(); }} style={{
-            padding: "10px 18px", borderRadius: 100, border: "none",
-            background: tab === k ? P.text : "transparent",
-            color: tab === k ? "#fff" : P.textTer,
-            fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-            transition: "all .2s",
-          }}>{l}</button>
-        ))}
+      <div style={{ padding: "20px 20px 0" }}>
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr",
+          background: "#E5E5EA", borderRadius: 10, padding: 2,
+          position: "relative",
+        }}>
+          <div style={{
+            position: "absolute", top: 2, bottom: 2,
+            width: "calc(50% - 2px)",
+            left: tab === "check" ? 2 : "calc(50%)",
+            background: "#FFFFFF",
+            borderRadius: 8,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
+            transition: "left .25s cubic-bezier(.4,0,.2,1)",
+            pointerEvents: "none",
+          }} />
+          {[
+            ["check", "Vertrag ich das?"],
+            ["swap", "Mach's besser"],
+          ].map(([k, l]) => (
+            <button key={k} onClick={() => { setTab(k); reset(); }} style={{
+              padding: "8px 4px", border: "none", background: "transparent",
+              color: tab === k ? P.text : P.textSec,
+              fontSize: 13, fontWeight: tab === k ? 600 : 500,
+              cursor: "pointer", fontFamily: "inherit",
+              borderRadius: 8, position: "relative", zIndex: 1,
+              transition: "color .2s",
+              letterSpacing: "-0.1px",
+            }}>{l}</button>
+          ))}
+        </div>
       </div>
 
       {/* ── CHECK TAB ── */}
