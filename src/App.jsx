@@ -335,8 +335,16 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Headline ── */}
+      {!mode && !loading && !result && !swapResult && (
+        <div style={{ padding: "24px 20px 0" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: -.5 }}>Iss, was dir<br/>gut tut.</div>
+          <div style={{ fontSize: 14, color: P.textSec, marginTop: 6 }}>FODMAP-Check für Essen, Produkte & Rezepte.</div>
+        </div>
+      )}
+
       {/* ── Navigation ── */}
-      <div style={{ padding: "20px 20px 0" }}>
+      <div style={{ padding: "16px 20px 0" }}>
         <div style={{
           display: "grid", gridTemplateColumns: "1fr 1fr",
           background: "#E5E5EA", borderRadius: 10, padding: 2,
@@ -375,8 +383,6 @@ export default function App() {
           {/* Mode Selection */}
           {!mode && !loading && !result && (
             <div>
-              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, lineHeight: 1.2 }}>Was steht auf<br/>dem Speiseplan?</div>
-              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 20 }}>Finde heraus, ob dein Essen verträglich ist.</div>
               <div style={{ display: "flex", gap: 10 }}>
                 <InputModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
                 <InputModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
@@ -490,8 +496,6 @@ export default function App() {
         <div style={{ padding: "16px 20px 0" }}>
           {!loading && !swapResult && (
             <div>
-              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, lineHeight: 1.2 }}>Dein Lieblingsessen,<br/>nur verträglicher.</div>
-              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 20, lineHeight: 1.5 }}>Sag uns welches Gericht du liebst — wir zeigen dir, wie du es verträglich machen kannst.</div>
               <input value={input} onChange={e => setInput(e.target.value)} placeholder="z.B. Pizza, Döner, Pasta Bolognese…"
                 style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 14 }} />
               <ActionButton onClick={swapAI} disabled={!input.trim()}>Alternativen finden</ActionButton>
