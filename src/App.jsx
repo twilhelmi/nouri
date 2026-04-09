@@ -113,17 +113,6 @@ const Card = ({ children, style }) => (
   <div style={{ background: P.surface, borderRadius: P.radius, padding: 20, ...style }}>{children}</div>
 );
 
-const Pill = ({ active, children, onClick, icon }) => (
-  <button onClick={onClick} style={{
-    display: "flex", alignItems: "center", gap: 6,
-    padding: "10px 18px", borderRadius: 100, border: "none",
-    background: active ? P.text : P.surfaceAlt,
-    color: active ? "#fff" : P.textSec,
-    fontSize: 14, fontWeight: 600, cursor: "pointer",
-    fontFamily: "inherit", transition: "all .2s",
-  }}>{icon && <span style={{ fontSize: 15 }}>{icon}</span>}{children}</button>
-);
-
 const ActionButton = ({ children, onClick, disabled, variant = "primary", style }) => (
   <button onClick={onClick} disabled={disabled} style={{
     width: "100%", padding: "16px", borderRadius: 100, border: "none",
@@ -136,19 +125,20 @@ const ActionButton = ({ children, onClick, disabled, variant = "primary", style 
 
 const InputModeCard = ({ icon, title, sub, onClick }) => (
   <button onClick={onClick} style={{
-    flex: 1, padding: "20px 12px 16px", borderRadius: P.radius, border: `1.5px solid ${P.border}`,
+    flex: 1, padding: "22px 12px 18px", borderRadius: P.radius, border: `1.5px solid ${P.border}`,
     background: P.surface, cursor: "pointer", textAlign: "center", display: "flex",
-    flexDirection: "column", alignItems: "center", gap: 4, transition: "all .2s",
+    flexDirection: "column", alignItems: "center", gap: 4, transition: "all .15s",
+    fontFamily: "inherit",
   }}>
-    <span style={{ fontSize: 28, lineHeight: 1 }}>{icon}</span>
-    <span style={{ fontSize: 13, fontWeight: 700, color: P.text, marginTop: 4 }}>{title}</span>
-    <span style={{ fontSize: 11, color: P.textTer, lineHeight: 1.3 }}>{sub}</span>
+    <span style={{ fontSize: 30, lineHeight: 1 }}>{icon}</span>
+    <span style={{ fontSize: 14, fontWeight: 700, color: P.text, marginTop: 6 }}>{title}</span>
+    <span style={{ fontSize: 12, color: P.textTer, lineHeight: 1.3 }}>{sub}</span>
   </button>
 );
 
 /* ── Main App ── */
 export default function App() {
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY || localStorage.getItem("fodmap-key") || "");
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY || "");
   const [showSetup, setShowSetup] = useState(false);
   const [tab, setTab] = useState("check");
   const [mode, setMode] = useState(null);
@@ -164,19 +154,15 @@ export default function App() {
   const [fadeIn, setFadeIn] = useState(false);
   const [barcodeManual, setBarcodeManual] = useState("");
   const fileRef = useRef();
-  const labelRef = useRef();
 
-  useEffect(() => {
-    const saved = localStorage.getItem("fodmap-key");
-    if (saved) setApiKey(saved);
-  }, []);
-
-  const saveKey = k => { setApiKey(k); localStorage.setItem("fodmap-key", k); };
+  const saveKey = k => { setApiKey(k); };
 
   const callAI = useCallback(async (content) => {
+    const key = apiKey || import.meta.env.VITE_API_KEY;
+    if (!key) throw new Error("Kein API Key hinterlegt");
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
       body: JSON.stringify({ model: MODEL, max_tokens: 1024, messages: [{ role: "user", content }] })
     });
     const data = await res.json();
@@ -190,7 +176,8 @@ export default function App() {
   const showRes = (parsed) => { setResult(parsed); setFadeIn(true); setTimeout(() => setFadeIn(false), 500); };
 
   const analyze = async (promptOverride, imgOverride) => {
-    if (!apiKey) { setShowSetup(true); return; }
+    const key = apiKey || import.meta.env.VITE_API_KEY;
+    if (!key) { setShowSetup(true); return; }
     setLoading(true); setLoadMsg(imgOverride || image ? "Bild wird analysiert…" : "Wird analysiert…");
     setError(null); setResult(null);
     try {
@@ -227,7 +214,8 @@ export default function App() {
   }, [apiKey, callAI]);
 
   const swapAI = async () => {
-    if (!apiKey) { setShowSetup(true); return; }
+    const key = apiKey || import.meta.env.VITE_API_KEY;
+    if (!key) { setShowSetup(true); return; }
     setLoading(true); setLoadMsg("Alternativen werden gesucht…"); setError(null); setSwapResult(null);
     try {
       const parsed = await callAI(PROMPT_SWAP + "\n\nDas Gericht: " + input);
@@ -248,7 +236,6 @@ export default function App() {
     setInput(""); setImage(null); setResult(null); setSwapResult(null);
     setError(null); setMode(null); setProductInfo(null); setBarcodeManual("");
     if (fileRef.current) fileRef.current.value = "";
-    if (labelRef.current) labelRef.current.value = "";
   };
 
   /* ── Result Sub-Components ── */
@@ -324,17 +311,15 @@ export default function App() {
 
       {/* ── Header ── */}
       <div style={{ padding: "24px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -.8, color: P.text }}>
-            nouri<span style={{ color: P.green }}>.</span>
-          </div>
-          <div style={{ fontSize: 12, color: P.textTer, fontWeight: 500, marginTop: -1 }}>Essen, das zu dir passt</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+          <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: -.8, color: P.text }}>nouri</span>
+          <span style={{ fontSize: 26, fontWeight: 800, color: P.green }}>.</span>
         </div>
         <button onClick={() => setShowSetup(!showSetup)} style={{
           width: 40, height: 40, borderRadius: 12, border: `1.5px solid ${P.border}`,
           background: P.surface, color: P.textSec, fontSize: 17, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-        }}>{apiKey ? "⚙" : "🔑"}</button>
+        }}>⚙</button>
       </div>
 
       {/* API Key Setup */}
@@ -345,15 +330,25 @@ export default function App() {
             <div style={{ fontSize: 13, color: P.textSec, marginBottom: 12, lineHeight: 1.4 }}>Dein Anthropic API Key für die AI-Analyse.</div>
             <input value={apiKey} onChange={e => saveKey(e.target.value)} placeholder="sk-ant-..." type="password"
               style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "12px 14px", color: P.text, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", transition: "border .2s" }} />
-            {apiKey && <div style={{ fontSize: 12, color: P.green, marginTop: 8, fontWeight: 600 }}>✓ Gespeichert</div>}
+            {apiKey && <div style={{ fontSize: 12, color: P.green, marginTop: 8, fontWeight: 600 }}>✓ Verbunden</div>}
           </Card>
         </div>
       )}
 
-      {/* ── Tab Pills ── */}
-      <div style={{ display: "flex", gap: 8, padding: "20px 20px 0" }}>
-        <Pill active={tab === "check"} onClick={() => { setTab("check"); reset(); }} icon="🔍">Check</Pill>
-        <Pill active={tab === "swap"} onClick={() => { setTab("swap"); reset(); }} icon="🔄">Swap</Pill>
+      {/* ── Navigation ── */}
+      <div style={{ display: "flex", gap: 0, padding: "20px 20px 0" }}>
+        {[
+          ["check", "Verträglich?"],
+          ["swap", "Besser machen"],
+        ].map(([k, l]) => (
+          <button key={k} onClick={() => { setTab(k); reset(); }} style={{
+            padding: "10px 18px", borderRadius: 100, border: "none",
+            background: tab === k ? P.text : "transparent",
+            color: tab === k ? "#fff" : P.textTer,
+            fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            transition: "all .2s",
+          }}>{l}</button>
+        ))}
       </div>
 
       {/* ── CHECK TAB ── */}
@@ -362,20 +357,14 @@ export default function App() {
           {/* Mode Selection */}
           {!mode && !loading && !result && (
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Was isst du?</div>
-              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 18, lineHeight: 1.4 }}>Wähle aus, wie du dein Essen checken willst.</div>
-              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, lineHeight: 1.2 }}>Was steht auf<br/>dem Speiseplan?</div>
+              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 20 }}>Finde heraus, ob dein Essen verträglich ist.</div>
+              <div style={{ display: "flex", gap: 10 }}>
                 <InputModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
-                <InputModeCard icon="📸" title="Foto" sub="Essen fotografieren" onClick={() => fileRef.current?.click()} />
+                <InputModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
                 <InputModeCard icon="📦" title="Barcode" sub="Produkt scannen" onClick={() => setMode("barcode")} />
               </div>
-              <button onClick={() => labelRef.current?.click()} style={{
-                width: "100%", padding: "14px", borderRadius: P.radius, border: `1.5px solid ${P.border}`,
-                background: P.surface, cursor: "pointer", textAlign: "center", fontSize: 14, color: P.textSec,
-                fontWeight: 500, fontFamily: "inherit",
-              }}>🏷️ Zutatenliste fotografieren</button>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImg(PROMPT_CHECK)} style={{ display: "none" }} />
-              <input ref={labelRef} type="file" accept="image/*" capture="environment" onChange={handleImg(PROMPT_LABEL)} style={{ display: "none" }} />
             </div>
           )}
 
@@ -387,16 +376,19 @@ export default function App() {
                   width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`,
                   background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>←</button>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>Barcode scannen</div>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>Produkt scannen</div>
+                  <div style={{ fontSize: 13, color: P.textSec }}>Scanne den Barcode auf der Verpackung</div>
+                </div>
               </div>
-              <ActionButton onClick={() => setScanning(true)}>📷 Kamera öffnen</ActionButton>
+              <ActionButton onClick={() => setScanning(true)}>Kamera öffnen</ActionButton>
               <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
                 <div style={{ flex: 1, height: 1, background: P.border }} />
                 <span style={{ fontSize: 12, color: P.textTer, fontWeight: 500 }}>oder manuell</span>
                 <div style={{ flex: 1, height: 1, background: P.border }} />
               </div>
               <input value={barcodeManual} onChange={e => setBarcodeManual(e.target.value.replace(/\D/g, ""))}
-                placeholder="EAN eingeben" inputMode="numeric"
+                placeholder="EAN-Nummer eingeben" inputMode="numeric"
                 style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px 14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 12 }} />
               <ActionButton onClick={() => barcodeManual.length >= 8 && onBarcode(barcodeManual)} disabled={barcodeManual.length < 8}>Produkt suchen</ActionButton>
             </Card>
@@ -410,12 +402,15 @@ export default function App() {
                   width: 36, height: 36, borderRadius: 10, border: `1.5px solid ${P.border}`,
                   background: P.surface, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>←</button>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>Was möchtest du essen?</div>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>Gericht beschreiben</div>
+                  <div style={{ fontSize: 13, color: P.textSec }}>Was möchtest du essen?</div>
+                </div>
               </div>
               <textarea value={input} onChange={e => setInput(e.target.value)}
                 placeholder={"z.B. Pasta mit Knoblauch und Sahnesauce\noder: Apfel, Joghurt, Honig"} rows={3}
                 style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", lineHeight: 1.5, marginBottom: 14 }} />
-              <ActionButton onClick={() => analyze()} disabled={!input.trim()}>Analysieren</ActionButton>
+              <ActionButton onClick={() => analyze()} disabled={!input.trim()}>Verträglichkeit prüfen</ActionButton>
             </Card>
           )}
 
@@ -461,10 +456,10 @@ export default function App() {
                 {result.summary && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.6, marginTop: 16 }}>{result.summary}</div>}
               </Card>
               <Card style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 8 }}>Zutaten-Check</div>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, color: P.textTer, marginBottom: 8 }}>Einzelne Zutaten</div>
                 {result.items?.map((it, i) => <ItemRow key={i} it={it} last={i === result.items.length - 1} />)}
               </Card>
-              {result.safe_version && tipBox(P.green, P.greenBg, P.greenBd, "💡", "FODMAP-arm machen", result.safe_version)}
+              {result.safe_version && tipBox(P.green, P.greenBg, P.greenBd, "💡", "So wird's verträglich", result.safe_version)}
               {result.tip && tipBox(P.amber, P.amberBg, P.amberBd, "🧠", "Gut zu wissen", result.tip)}
               <ActionButton onClick={reset} variant="secondary" style={{ marginTop: 4 }}>Neuer Check</ActionButton>
             </div>
@@ -477,19 +472,22 @@ export default function App() {
         <div style={{ padding: "16px 20px 0" }}>
           {!loading && !swapResult && (
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Gericht umbauen</div>
-              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 18, lineHeight: 1.4 }}>Finde FODMAP-arme Alternativen zu deinem Lieblingsgericht.</div>
-              <input value={input} onChange={e => setInput(e.target.value)} placeholder="z.B. Pasta Bolognese, Döner, Curry…"
+              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, lineHeight: 1.2 }}>Dein Lieblingsessen,<br/>nur verträglicher.</div>
+              <div style={{ fontSize: 14, color: P.textSec, marginBottom: 20, lineHeight: 1.5 }}>Sag uns welches Gericht du liebst — wir zeigen dir, wie du es verträglich machen kannst.</div>
+              <input value={input} onChange={e => setInput(e.target.value)} placeholder="z.B. Pizza, Döner, Pasta Bolognese…"
                 style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 14 }} />
               <ActionButton onClick={swapAI} disabled={!input.trim()}>Alternativen finden</ActionButton>
               {!input && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
-                  {["Pasta Bolognese", "Pizza", "Döner", "Burger", "Risotto", "Curry", "Ramen", "Müsli"].map((q, i) => (
-                    <button key={i} onClick={() => setInput(q)} style={{
-                      fontSize: 13, fontWeight: 500, background: P.surfaceAlt, border: "none",
-                      color: P.textSec, padding: "8px 14px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
-                    }}>{q}</button>
-                  ))}
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: P.textTer, textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Beliebt</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {["Pasta Bolognese", "Pizza", "Döner", "Burger", "Risotto", "Curry", "Ramen", "Müsli"].map((q, i) => (
+                      <button key={i} onClick={() => setInput(q)} style={{
+                        fontSize: 13, fontWeight: 500, background: P.surface, border: `1.5px solid ${P.border}`,
+                        color: P.text, padding: "8px 14px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
+                      }}>{q}</button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -503,12 +501,13 @@ export default function App() {
           {error && (
             <div style={{ background: P.redBg, border: `1px solid ${P.redBd}`, borderRadius: P.radius, padding: "16px", fontSize: 14, color: P.red }}>
               {error}
+              <div onClick={reset} style={{ marginTop: 10, fontSize: 13, fontWeight: 600, textDecoration: "underline", cursor: "pointer" }}>Nochmal versuchen</div>
             </div>
           )}
           {swapResult && !loading && (
             <div className={fadeIn ? "fade-in" : ""}>
-              <div style={{ fontSize: 13, color: P.textTer, fontWeight: 600, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Statt „{swapResult.original}"</div>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>3 Alternativen</div>
+              <div style={{ fontSize: 13, color: P.textTer, fontWeight: 600, marginBottom: 4 }}>Statt „{swapResult.original}"</div>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>3 verträgliche Ideen</div>
               {swapResult.alternatives?.map((a, i) => (
                 <Card key={i} style={{ marginBottom: 10, border: `1.5px solid ${P.greenBd}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -516,22 +515,22 @@ export default function App() {
                     <span style={{
                       fontSize: 11, background: P.surfaceAlt, color: P.textSec,
                       padding: "4px 10px", borderRadius: 100, fontWeight: 600, whiteSpace: "nowrap",
-                    }}>{a.effort === "einfach" ? "⚡" : a.effort === "mittel" ? "👩‍🍳" : "🎯"} {a.effort}</span>
+                    }}>{a.effort === "einfach" ? "⚡ Schnell" : a.effort === "mittel" ? "👩‍🍳 Mittel" : "🎯 Aufwendig"}</span>
                   </div>
                   <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.5, marginBottom: 14 }}>{a.why}</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <div style={{ flex: 1, background: P.redBg, borderRadius: P.radiusSm, padding: "10px 12px" }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: P.red, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>Raus</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: P.red, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>Weglassen</div>
                       <div style={{ fontSize: 13, color: P.textSec, lineHeight: 1.4 }}>{a.swap_out}</div>
                     </div>
                     <div style={{ flex: 1, background: P.greenBg, borderRadius: P.radiusSm, padding: "10px 12px" }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>Rein</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>Stattdessen</div>
                       <div style={{ fontSize: 13, color: P.textSec, lineHeight: 1.4 }}>{a.swap_in}</div>
                     </div>
                   </div>
                 </Card>
               ))}
-              <ActionButton onClick={reset} variant="secondary" style={{ marginTop: 4 }}>Neuer Swap</ActionButton>
+              <ActionButton onClick={reset} variant="secondary" style={{ marginTop: 4 }}>Nochmal suchen</ActionButton>
             </div>
           )}
         </div>
