@@ -23,8 +23,8 @@ const categoryLabel = c => {
 
 const MODEL = "claude-haiku-4-5-20251001";
 const SYS = "Du bist ein strenger aber freundlicher FODMAP-Ernährungsberater nach Monash-Universität-Richtlinien. WICHTIG: Sei bei der Einstufung STRENG und KORREKT. Knoblauch, Zwiebeln, Weizen, Honig, Äpfel, Birnen, Wassermelone, Pilze, Blumenkohl sind IMMER high-FODMAP. Laktose-haltige Milchprodukte sind moderate bis high. Wenn auch nur EINE Zutat high-FODMAP ist, muss overall mindestens moderate sein. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
-const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz. Bei high: benenne das Hauptproblem kurz und mach Mut. Bei low: bestätige kurz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter, verständlich.","alternative":"Verträgliche Alternative oder null"}]}`;
-const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher kurzer Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter.","alternative":"null oder Alternative"}]}`;
+const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). WICHTIG: Liste NUR Zutaten auf die der User auch eingegeben hat oder die offensichtlich Teil des Gerichts sind. Erfinde KEINE Zutaten dazu. NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"1 kurzer ermutigender Satz, linksbündig geeignet. Bei high: was ist das Hauptproblem? Bei low: kurze Bestätigung.","takeaway":"1 Satz den sich der User merken soll — die wichtigste Erkenntnis aus diesem Check. Beginne mit einem Verb.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 6 Wörter, kein Satzzeichen am Ende","alternative":"Kurze verträgliche Alternative oder null"}]}`;
+const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. WICHTIG: Erfinde KEINE Zutaten die nicht in der Liste stehen. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"1 kurzer Satz.","takeaway":"1 Satz den sich der User merken soll. Beginne mit einem Verb.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 6 Wörter","alternative":"null oder kurze Alternative"}]}`;
 const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname (z.B. Cremige Knoblauch-Pasta)","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 const PROMPT_EDIT = `Du hast ein Rezept erstellt. Der Nutzer möchte es anpassen. Erstelle die angepasste Version. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
@@ -447,20 +447,30 @@ export default function App() {
               </div>
             )}
 
+            {/* Verdict Card */}
             <Card style={{ marginBottom: 12, borderLeft: `4px solid ${colorOf(result.overall)}` }}>
-              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 12 }}>{result.title}</div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: bgOf(result.overall), padding: "7px 14px", borderRadius: 100, marginBottom: result.summary ? 14 : 0 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 12, textAlign: "left" }}>{result.title}</div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: bgOf(result.overall), padding: "7px 14px", borderRadius: 100, marginBottom: result.summary ? 12 : 0 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 4, background: colorOf(result.overall) }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: colorOf(result.overall) }}>
                   {result.overall === "low" ? "Verträglich" : result.overall === "moderate" ? "Vorsicht" : "Nicht verträglich"}
                 </span>
               </div>
-              {result.summary && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.6 }}>{result.summary}</div>}
+              {result.summary && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.6, textAlign: "left" }}>{result.summary}</div>}
             </Card>
 
+            {/* Takeaway */}
+            {result.takeaway && (
+              <div style={{ background: B.sage, borderRadius: B.radius, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>💡</span>
+                <div style={{ fontSize: 15, fontWeight: 600, color: B.teal, lineHeight: 1.5, textAlign: "left" }}>{result.takeaway}</div>
+              </div>
+            )}
+
+            {/* Ingredients */}
             <Card style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: B.warmGray }}>Zutaten</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: B.warmGray, textAlign: "left" }}>Zutaten</span>
                 <span style={{ fontSize: 12, color: B.warmGray }}>Tippe für Details</span>
               </div>
               {result.items?.map((it, i) => <IngredientRow key={i} it={it} last={i === result.items.length - 1} />)}
