@@ -25,9 +25,9 @@ const MODEL = "claude-haiku-4-5-20251001";
 const SYS = "Du bist ein strenger aber freundlicher FODMAP-Ernährungsberater nach Monash-Universität-Richtlinien. WICHTIG: Sei bei der Einstufung STRENG und KORREKT. Knoblauch, Zwiebeln, Weizen, Honig, Äpfel, Birnen, Wassermelone, Pilze, Blumenkohl sind IMMER high-FODMAP. Laktose-haltige Milchprodukte sind moderate bis high. Wenn auch nur EINE Zutat high-FODMAP ist, muss overall mindestens moderate sein. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
 const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz. Bei high: benenne das Hauptproblem kurz und mach Mut. Bei low: bestätige kurz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter, verständlich.","alternative":"Verträgliche Alternative oder null"}]}`;
 const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher kurzer Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter.","alternative":"null oder Alternative"}]}`;
-const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie. Einfache Sprache. NUR JSON:\n{"title":"Dein verträglicher [Gerichtname] (ersetze [Gerichtname])","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Dein verträglicher [Gerichtname] (ersetze [Gerichtname])","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_EDIT = `Du hast ein Rezept erstellt. Der Nutzer möchte es anpassen. Erstelle die angepasste Version. Behalte den Titel-Stil "Dein verträglicher..." bei. Einfache Sprache. NUR JSON:\n{"title":"Dein verträglicher [Gerichtname]","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname (z.B. Cremige Knoblauch-Pasta)","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_EDIT = `Du hast ein Rezept erstellt. Der Nutzer möchte es anpassen. Erstelle die angepasste Version. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 
 function loadZXing() {
   return new Promise((resolve, reject) => {
@@ -162,8 +162,8 @@ function IngredientRow({ it, last }) {
           {it.detail && <div style={{ fontSize: 13, color: B.warmGray, lineHeight: 1.5, marginBottom: it.alternative ? 8 : 0 }}>{it.detail}</div>}
           {it.alternative && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: B.sage, borderRadius: 8, padding: "8px 12px" }}>
-              <span style={{ fontSize: 13 }}>🔄</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: B.teal }}>Besser: {it.alternative}</span>
+              <span style={{ fontSize: 13, color: B.teal }}>→</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: B.teal }}>Stattdessen: {it.alternative}</span>
             </div>
           )}
         </div>
@@ -477,15 +477,17 @@ export default function App() {
         {step === "recipe" && recipe && !loading && (
           <div className={fadeIn ? "fade-in" : ""} style={{ paddingTop: 16 }}>
             <Card style={{ marginBottom: 12, border: `1.5px solid ${B.okBd}` }}>
-              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 8 }}>{recipe.title}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 15 }}>✨</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: B.teal, textTransform: "uppercase", letterSpacing: .5 }}>Dein Rezept</span>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 10, textAlign: "left" }}>{recipe.title}</div>
 
-              {recipe.tags?.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  {recipe.tags.map((tag, i) => <Tag key={i}>{tag}</Tag>)}
-                </div>
-              )}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                <Tag>FODMAP-arm</Tag>
+              </div>
 
-              {recipe.description && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.5, marginBottom: 16 }}>{recipe.description}</div>}
+              {recipe.description && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.5, marginBottom: 16, textAlign: "left" }}>{recipe.description}</div>}
 
               <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
                 {recipe.servings && <div style={{ background: B.sand, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: B.warmGray, fontWeight: 500 }}>👤 {recipe.servings} Portionen</div>}
@@ -553,11 +555,13 @@ export default function App() {
               </Card>
             )}
 
-            {/* Nav links */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 12, marginBottom: 8 }}>
-              {result && <TextLink onClick={() => { setStep("result"); setRecipe(null); setEditMode(false); setError(null); }}>← Zurück zum Check</TextLink>}
-            </div>
-            <Btn variant="green" onClick={reset}>Neuer Check</Btn>
+            {/* Nav */}
+            <Btn variant="green" onClick={reset} style={{ marginTop: 4 }}>Neuer Check</Btn>
+            {result && (
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <TextLink onClick={() => { setStep("result"); setRecipe(null); setEditMode(false); setError(null); }}>← Zurück zum Check</TextLink>
+              </div>
+            )}
           </div>
         )}
       </div>
