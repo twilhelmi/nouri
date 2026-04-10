@@ -113,59 +113,64 @@ const Tag = ({ children }) => (
   <span style={{ fontSize: 12, fontWeight: 600, background: B.sage, color: B.teal, padding: "4px 12px", borderRadius: 100 }}>{children}</span>
 );
 
-function ChipInput({ value, onChange, placeholder, suggestions, onSubmit }) {
-  const [filtered, setFiltered] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const allSuggestions = suggestions || [];
+const QUICK_SUGGESTIONS = ["Pasta Aglio Olio", "Caesar Salad", "Chicken Curry", "Döner", "Risotto", "Ofengemüse", "Hummus", "Pizza"];
+
+function ChipInput({ value, onChange, placeholder, onSubmit, showQuickSuggestions = true }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef(null);
+
+  const searchFood = useCallback(async (query) => {
+    if (query.length < 2) { setSuggestions([]); setShowDropdown(false); return; }
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5&fields=product_name`);
+      const data = await res.json();
+      const names = data.products?.map(p => p.product_name).filter(Boolean).filter((n, i, a) => a.indexOf(n) === i).slice(0, 5) || [];
+      // Also add common dish suggestions
+      const dishes = QUICK_SUGGESTIONS.filter(s => s.toLowerCase().includes(query.toLowerCase()));
+      const combined = [...new Set([...dishes, ...names])].slice(0, 6);
+      setSuggestions(combined);
+      setShowDropdown(combined.length > 0);
+    } catch { setSuggestions([]); setShowDropdown(false); }
+  }, []);
 
   const handleChange = (v) => {
     onChange(v);
-    if (v.length > 0) {
-      const f = allSuggestions.filter(s => s.toLowerCase().includes(v.toLowerCase()) && s.toLowerCase() !== v.toLowerCase());
-      setFiltered(f.slice(0, 4));
-      setShowSuggestions(f.length > 0);
-    } else {
-      setFiltered([]);
-      setShowSuggestions(false);
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchFood(v), 300);
   };
 
-  const selectSuggestion = (s) => {
-    onChange(s);
-    setShowSuggestions(false);
-    setFiltered([]);
-  };
+  const select = (s) => { onChange(s); setShowDropdown(false); setSuggestions([]); };
 
   return (
     <div>
       <div style={{ position: "relative" }}>
         <input value={value} onChange={e => handleChange(e.target.value)} placeholder={placeholder}
-          onKeyDown={e => { if (e.key === "Enter" && value.trim() && onSubmit) onSubmit(); }}
-          onFocus={() => { if (value && filtered.length) setShowSuggestions(true); }}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          onKeyDown={e => { if (e.key === "Enter" && value.trim() && onSubmit) { setShowDropdown(false); onSubmit(); } }}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
           style={{ width: "100%", background: B.sand, border: `1.5px solid ${B.lightGray}`, borderRadius: B.radiusSm, padding: "14px", paddingRight: value ? 44 : 14, color: B.charcoal, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box" }} />
         {value && (
-          <button onClick={() => { onChange(""); setShowSuggestions(false); }} style={{
+          <button onClick={() => { onChange(""); setShowDropdown(false); }} style={{
             position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
             width: 26, height: 26, borderRadius: 13, border: "none", background: B.lightGray,
             color: B.warmGray, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           }}>✕</button>
         )}
-        {showSuggestions && filtered.length > 0 && (
+        {showDropdown && suggestions.length > 0 && (
           <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: B.white, borderRadius: B.radiusSm, boxShadow: "0 4px 16px rgba(0,0,0,.1)", marginTop: 4, zIndex: 10, overflow: "hidden" }}>
-            {filtered.map((s, i) => (
-              <button key={i} onMouseDown={() => selectSuggestion(s)} style={{
-                width: "100%", padding: "12px 16px", background: "none", border: "none", borderBottom: i < filtered.length - 1 ? `1px solid ${B.lightGray}` : "none",
+            {suggestions.map((s, i) => (
+              <button key={i} onMouseDown={() => select(s)} style={{
+                width: "100%", padding: "12px 16px", background: "none", border: "none", borderBottom: i < suggestions.length - 1 ? `1px solid ${B.lightGray}` : "none",
                 fontSize: 15, color: B.charcoal, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
               }}>{s}</button>
             ))}
           </div>
         )}
       </div>
-      {!value && suggestions && (
+      {!value && showQuickSuggestions && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-          {suggestions.map((q, i) => (
-            <button key={i} onClick={() => selectSuggestion(q)} style={{
+          {QUICK_SUGGESTIONS.map((q, i) => (
+            <button key={i} onClick={() => select(q)} style={{
               fontSize: 13, fontWeight: 500, background: B.white, border: `1.5px solid ${B.lightGray}`,
               color: B.charcoal, padding: "8px 14px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
             }}>{q}</button>
@@ -401,7 +406,6 @@ export default function App() {
                   <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.2, letterSpacing: -.5, marginBottom: 6 }}>Was soll auf den Tisch?</div>
                   <div style={{ fontSize: 15, color: B.warmGray, marginBottom: 18, lineHeight: 1.5 }}>Beschreib worauf du Lust hast — wir machen es verträglich.</div>
                   <ChipInput value={hungerInput} onChange={setHungerInput} placeholder="z.B. Pasta, Hähnchen, Curry…"
-                    suggestions={["Pasta", "Hähnchen Bowl", "Curry", "Risotto", "Salat", "Ofengemüse"]}
                     onSubmit={loadHungerRecipe} />
                   <div style={{ marginTop: 14 }}>
                     <Btn variant="magic" onClick={loadHungerRecipe} disabled={!hungerInput.trim()}>Rezept zaubern 🪄</Btn>
@@ -420,7 +424,6 @@ export default function App() {
                   </div>
                 </div>
                 <ChipInput value={input} onChange={setInput} placeholder="z.B. Pasta mit Knoblauch und Sahne"
-                  suggestions={["Pasta Aglio Olio", "Caesar Salad", "Chicken Curry", "Döner", "Risotto", "Müsli mit Joghurt", "Hummus", "Pizza Margherita"]}
                   onSubmit={() => input.trim() && analyze()} />
                 <div style={{ marginTop: 14 }}>
                   <Btn onClick={() => analyze()} disabled={!input.trim()}>Prüfen</Btn>
