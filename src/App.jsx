@@ -19,12 +19,11 @@ const categoryLabel = c => {
 
 const MODEL = "claude-haiku-4-5-20251001";
 const SYS = "Du bist ein strenger aber freundlicher FODMAP-Ernährungsberater nach Monash-Universität-Richtlinien. WICHTIG: Sei bei der Einstufung STRENG und KORREKT. Knoblauch, Zwiebeln, Weizen, Honig, Äpfel, Birnen, Wassermelone, Pilze, Blumenkohl sind IMMER high-FODMAP. Laktose-haltige Milchprodukte sind moderate bis high. Wenn auch nur EINE Zutat high-FODMAP ist, muss overall mindestens moderate sein. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
-const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz. Bei high: benenne das Hauptproblem und mach Mut dass es eine Lösung gibt. Bei low: bestätige dass alles gut ist.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien.","alternative":"Verträgliche Alternative oder null"}]}`;
-const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"1 verständlicher Satz für Laien.","alternative":"null oder Alternative"}]}`;
-const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie automatisch durch verträgliche Alternativen. Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_MORE = `Erstelle 2 WEITERE verschiedene FODMAP-arme Rezepte passend zum Gericht. Anders als das erste Rezept! Kreativ und abwechslungsreich. Einfache Sprache. NUR JSON:\n{"recipes":[{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}]}`;
-const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
-const PROMPT_MORE_HUNGER = `Erstelle 2 WEITERE verschiedene FODMAP-arme Rezepte zum Thema. Anders als das erste! Kreativ. Einfache Sprache. NUR JSON:\n{"recipes":[{"title":"Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}]}`;
+const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"Ein freundlicher, ermutigender Satz. Bei high: benenne das Hauptproblem kurz und mach Mut. Bei low: bestätige kurz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter, verständlich für Laien.","alternative":"Verträgliche Alternative oder null"}]}`;
+const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"Ein freundlicher kurzer Satz.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 8 Wörter.","alternative":"null oder Alternative"}]}`;
+const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie durch verträgliche Alternativen. Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
+const PROMPT_EDIT = `Du hast ein Rezept erstellt. Der Nutzer möchte es anpassen. Erstelle die angepasste Version. Einfache Sprache. NUR JSON:\n{"title":"Rezeptname","description":"1 appetitlicher Satz","tags":["FODMAP-arm"],"servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 
 function loadZXing() {
   return new Promise((resolve, reject) => {
@@ -92,6 +91,35 @@ const ModeCard = ({ icon, title, sub, onClick }) => (
   </button>
 );
 
+/* Chip input with x to clear */
+function ChipInput({ value, onChange, placeholder, suggestions, style }) {
+  return (
+    <div style={style}>
+      <div style={{ position: "relative" }}>
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", paddingRight: value ? 44 : 14, color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box" }} />
+        {value && (
+          <button onClick={() => onChange("")} style={{
+            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+            width: 28, height: 28, borderRadius: 14, border: "none", background: P.border,
+            color: P.textSec, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>✕</button>
+        )}
+      </div>
+      {!value && suggestions && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+          {suggestions.map((q, i) => (
+            <button key={i} onClick={() => onChange(q)} style={{
+              fontSize: 13, fontWeight: 500, background: P.surface, border: `1.5px solid ${P.border}`,
+              color: P.text, padding: "8px 14px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
+            }}>{q}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IngredientRow({ it, last }) {
   const [open, setOpen] = useState(false);
   const isOk = it.fodmap === "low";
@@ -134,7 +162,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY || "");
   const [showSetup, setShowSetup] = useState(false);
   const [mode, setMode] = useState(null);
-  const [step, setStep] = useState("input"); // input | result | recipe
+  const [step, setStep] = useState("input");
   const [input, setInput] = useState("");
   const [hungerInput, setHungerInput] = useState("");
   const [image, setImage] = useState(null);
@@ -143,9 +171,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadMsg, setLoadMsg] = useState("");
   const [result, setResult] = useState(null);
-  const [recipes, setRecipes] = useState([]); // all loaded recipes
-  const [recipeIdx, setRecipeIdx] = useState(0); // currently shown
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [recipe, setRecipe] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editInput, setEditInput] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fadeIn, setFadeIn] = useState(false);
   const [barcodeManual, setBarcodeManual] = useState("");
@@ -173,7 +202,7 @@ export default function App() {
     const key = apiKey || import.meta.env.VITE_API_KEY;
     if (!key) { setShowSetup(true); return; }
     setLoading(true); setLoadMsg(imgOverride || image ? "Bild wird analysiert…" : "Wird analysiert…");
-    setError(null); setResult(null); setRecipes([]); setRecipeIdx(0);
+    setError(null); setResult(null); setRecipe(null);
     try {
       const prompt = promptOverride || PROMPT_CHECK;
       const img = imgOverride || image;
@@ -189,7 +218,7 @@ export default function App() {
   };
 
   const onBarcode = useCallback(async (code) => {
-    setScanning(false); setLoading(true); setLoadMsg("Produkt wird gesucht…"); setError(null); setResult(null); setRecipes([]); setRecipeIdx(0); setMode("barcode-result");
+    setScanning(false); setLoading(true); setLoadMsg("Produkt wird gesucht…"); setError(null); setResult(null); setRecipe(null); setMode("barcode-result");
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
@@ -218,22 +247,9 @@ export default function App() {
         extra = `\nProblematische Zutaten ersetzen: ${problems.map(i => `${i.name} → ${i.alternative || "weglassen"}`).join(", ")}`;
       }
       const parsed = await callAI(PROMPT_RECIPE + `\n\nDas Gericht: ${dishName}${extra}`);
-      setRecipes([parsed]); setRecipeIdx(0); setStep("recipe"); fade();
+      setRecipe(parsed); setStep("recipe"); setEditMode(false); setEditInput(""); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
-  };
-
-  const loadMoreRecipes = async () => {
-    setLoadingMore(true); setError(null);
-    try {
-      const dishName = result?.title || input || hungerInput;
-      const existing = recipes.map(r => r.title).join(", ");
-      const prompt = (mode === "hunger" ? PROMPT_MORE_HUNGER : PROMPT_MORE) + `\n\nDas Gericht: ${dishName}\nBereits vorgeschlagen (NICHT wiederholen): ${existing}`;
-      const parsed = await callAI(prompt);
-      const more = parsed.recipes || [parsed];
-      setRecipes(prev => [...prev, ...more]);
-    } catch (e) { setError(String(e?.message || e)); }
-    setLoadingMore(false);
   };
 
   const loadHungerRecipe = async () => {
@@ -243,26 +259,36 @@ export default function App() {
     setLoadMsg("Rezept wird gezaubert ✨");
     try {
       const parsed = await callAI(PROMPT_HUNGER + `\n\nDer Nutzer hat Hunger auf: ${hungerInput}`);
-      setRecipes([parsed]); setRecipeIdx(0); setStep("recipe"); fade();
+      setRecipe(parsed); setStep("recipe"); setEditMode(false); setEditInput(""); fade();
     } catch (e) { setError(String(e?.message || e)); }
     setLoading(false);
   };
 
+  const editRecipe = async () => {
+    if (!editInput.trim()) return;
+    setEditLoading(true); setError(null);
+    try {
+      const recipeStr = JSON.stringify(recipe);
+      const parsed = await callAI(PROMPT_EDIT + `\n\nAktuelles Rezept:\n${recipeStr}\n\nÄnderungswunsch: ${editInput}`);
+      setRecipe(parsed); setEditInput(""); setEditMode(false); fade();
+    } catch (e) { setError(String(e?.message || e)); }
+    setEditLoading(false);
+  };
+
   const handleImg = (prompt) => e => {
     const f = e.target.files?.[0]; if (!f) return;
-    setResult(null); setError(null); setRecipes([]); setRecipeIdx(0); setMode("photo-result");
+    setResult(null); setError(null); setRecipe(null); setMode("photo-result");
     const r = new FileReader();
     r.onload = () => { setImage(r.result); analyze(prompt, r.result); };
     r.readAsDataURL(f);
   };
 
   const reset = () => {
-    setInput(""); setHungerInput(""); setImage(null); setResult(null); setRecipes([]); setRecipeIdx(0);
-    setError(null); setMode(null); setStep("input"); setProductInfo(null); setBarcodeManual(""); setLoading(false); setLoadingMore(false);
+    setInput(""); setHungerInput(""); setImage(null); setResult(null); setRecipe(null);
+    setError(null); setMode(null); setStep("input"); setProductInfo(null); setBarcodeManual("");
+    setLoading(false); setEditMode(false); setEditInput(""); setEditLoading(false);
     if (fileRef.current) fileRef.current.value = "";
   };
-
-  const currentRecipe = recipes[recipeIdx];
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, color: P.text, fontFamily: "SF Pro Display, -apple-system, 'Helvetica Neue', sans-serif", maxWidth: 480, margin: "0 auto", paddingBottom: 40 }}>
@@ -310,31 +336,30 @@ export default function App() {
           <>
             {!mode && !loading && (
               <div style={{ paddingTop: 24 }}>
-                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: -.5 }}>Vertrag ich das?</div>
-                <div style={{ fontSize: 15, color: P.textSec, marginTop: 8, marginBottom: 24, lineHeight: 1.5 }}>Prüfe dein Essen auf Verträglichkeit.</div>
-                <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
-                  <ModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
-                  <ModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
-                  <ModeCard icon="📦" title="Barcode" sub="Produkt scannen" onClick={() => setMode("barcode")} />
-                </div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImg(PROMPT_CHECK)} style={{ display: "none" }} />
-
-                <div style={{ height: 1, background: P.border, marginBottom: 32 }} />
-                <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, letterSpacing: -.3 }}>Worauf hast du Hunger?</div>
-                <div style={{ fontSize: 15, color: P.textSec, marginTop: 6, marginBottom: 18, lineHeight: 1.5 }}>Wir zaubern dir ein verträgliches Rezept.</div>
-                <input value={hungerInput} onChange={e => setHungerInput(e.target.value)} placeholder="z.B. Pasta, was mit Hähnchen, Curry…"
-                  style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 12 }} />
-                <Btn variant="magic" onClick={loadHungerRecipe} disabled={!hungerInput.trim()}>Rezept zaubern 🪄</Btn>
-                {!hungerInput && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
-                    {["Pasta", "Hähnchen", "Salat", "Curry", "Risotto", "Suppe", "Bowl", "Pfanne"].map((q, i) => (
-                      <button key={i} onClick={() => setHungerInput(q)} style={{
-                        fontSize: 13, fontWeight: 500, background: P.surface, border: `1.5px solid ${P.border}`,
-                        color: P.text, padding: "8px 14px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
-                      }}>{q}</button>
-                    ))}
+                {/* Section 1: Check */}
+                <Card style={{ marginBottom: 12, padding: 24 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Essen checken</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, marginBottom: 6 }}>Vertrag ich das?</div>
+                  <div style={{ fontSize: 14, color: P.textSec, marginBottom: 20, lineHeight: 1.5 }}>Prüfe ein Gericht, Produkt oder Foto auf Verträglichkeit.</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <ModeCard icon="✏️" title="Eintippen" sub="Gericht beschreiben" onClick={() => setMode("text")} />
+                    <ModeCard icon="📸" title="Foto" sub="Essen oder Zutaten" onClick={() => fileRef.current?.click()} />
+                    <ModeCard icon="🔎" title="Scannen" sub="Barcode" onClick={() => setMode("barcode")} />
                   </div>
-                )}
+                  <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImg(PROMPT_CHECK)} style={{ display: "none" }} />
+                </Card>
+
+                {/* Section 2: Rezept */}
+                <Card style={{ padding: 24 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Rezept finden</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, marginBottom: 6 }}>Was soll auf den Tisch?</div>
+                  <div style={{ fontSize: 14, color: P.textSec, marginBottom: 18, lineHeight: 1.5 }}>Sag uns, worauf du Lust hast — wir zaubern ein verträgliches Rezept.</div>
+                  <ChipInput value={hungerInput} onChange={setHungerInput} placeholder="z.B. Pasta, was mit Hähnchen…"
+                    suggestions={["Pasta", "Hähnchen", "Salat", "Curry", "Risotto", "Suppe", "Bowl", "Pfanne"]} />
+                  <div style={{ marginTop: 14 }}>
+                    <Btn variant="magic" onClick={loadHungerRecipe} disabled={!hungerInput.trim()}>Rezept zaubern 🪄</Btn>
+                  </div>
+                </Card>
               </div>
             )}
 
@@ -347,9 +372,11 @@ export default function App() {
                     <div style={{ fontSize: 13, color: P.textSec }}>Was möchtest du essen?</div>
                   </div>
                 </div>
-                <textarea value={input} onChange={e => setInput(e.target.value)} placeholder="z.B. Pasta mit Knoblauch und Sahnesauce" rows={3}
-                  style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", lineHeight: 1.5, marginBottom: 14 }} />
-                <Btn onClick={() => analyze()} disabled={!input.trim()}>Prüfen</Btn>
+                <ChipInput value={input} onChange={setInput} placeholder="z.B. Pasta mit Knoblauch und Sahnesauce"
+                  suggestions={["Pasta Aglio Olio", "Chicken Curry", "Caesar Salad", "Risotto", "Döner", "Müsli mit Joghurt"]} />
+                <div style={{ marginTop: 14 }}>
+                  <Btn onClick={() => analyze()} disabled={!input.trim()}>Prüfen</Btn>
+                </div>
               </Card>
             )}
 
@@ -386,7 +413,7 @@ export default function App() {
         )}
 
         {/* Error */}
-        {error && !loading && !loadingMore && (
+        {error && !loading && !editLoading && (
           <div style={{ background: P.redBg, border: `1px solid ${P.redBd}`, borderRadius: P.radius, padding: 16, fontSize: 14, color: P.red, lineHeight: 1.5, marginTop: 16 }}>
             {error}
             <div onClick={reset} style={{ marginTop: 10, fontSize: 13, fontWeight: 600, textDecoration: "underline", cursor: "pointer" }}>Nochmal versuchen</div>
@@ -422,7 +449,7 @@ export default function App() {
             </Card>
             <Card style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 4 }}>Zutaten</div>
-              <div style={{ fontSize: 12, color: P.textTer, marginBottom: 12 }}>Tippe auf eine Zutat für Details</div>
+              <div style={{ fontSize: 12, color: P.textTer, marginBottom: 12 }}>Tippe für Details</div>
               {result.items?.map((it, i) => <IngredientRow key={i} it={it} last={i === result.items.length - 1} />)}
             </Card>
             <Btn variant="magic" onClick={loadRecipe} style={{ marginBottom: 8 }}>
@@ -433,35 +460,32 @@ export default function App() {
         )}
 
         {/* ═══ RECIPE ═══ */}
-        {step === "recipe" && currentRecipe && !loading && (
+        {step === "recipe" && recipe && !loading && (
           <div className={fadeIn ? "fade-in" : ""} style={{ paddingTop: 16 }}>
-            {/* Recipe counter if multiple */}
-            {recipes.length > 1 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 16 }}>
-                <button onClick={() => { setRecipeIdx(Math.max(0, recipeIdx - 1)); fade(); }}
-                  disabled={recipeIdx === 0}
-                  style={{ width: 36, height: 36, borderRadius: 18, border: `1.5px solid ${P.border}`, background: P.surface, fontSize: 16, cursor: recipeIdx === 0 ? "default" : "pointer", color: recipeIdx === 0 ? P.textTer : P.text, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
-                <span style={{ fontSize: 14, fontWeight: 600, color: P.textSec }}>Rezept {recipeIdx + 1} von {recipes.length}</span>
-                <button onClick={() => { setRecipeIdx(Math.min(recipes.length - 1, recipeIdx + 1)); fade(); }}
-                  disabled={recipeIdx === recipes.length - 1}
-                  style={{ width: 36, height: 36, borderRadius: 18, border: `1.5px solid ${P.border}`, background: P.surface, fontSize: 16, cursor: recipeIdx === recipes.length - 1 ? "default" : "pointer", color: recipeIdx === recipes.length - 1 ? P.textTer : P.text, display: "flex", alignItems: "center", justifyContent: "center" }}>→</button>
-              </div>
-            )}
-
             <Card style={{ marginBottom: 12, border: `1.5px solid ${P.greenBd}` }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: P.green, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>✨ Dein Rezept</div>
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{currentRecipe.title}</div>
-              {currentRecipe.description && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.5, marginBottom: 16 }}>{currentRecipe.description}</div>}
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{recipe.title}</div>
+
+              {/* Tags */}
+              {recipe.tags?.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  {recipe.tags.map((tag, i) => (
+                    <span key={i} style={{ fontSize: 11, fontWeight: 600, background: P.greenBg, color: P.green, padding: "4px 10px", borderRadius: 100 }}>{tag}</span>
+                  ))}
+                </div>
+              )}
+
+              {recipe.description && <div style={{ fontSize: 14, color: P.textSec, lineHeight: 1.5, marginBottom: 16 }}>{recipe.description}</div>}
 
               <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-                {currentRecipe.servings && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>👤 {currentRecipe.servings} Portionen</div>}
-                {currentRecipe.time && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>⏱ {currentRecipe.time}</div>}
+                {recipe.servings && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>👤 {recipe.servings} Portionen</div>}
+                {recipe.time && <div style={{ background: P.surfaceAlt, borderRadius: 10, padding: "8px 12px", fontSize: 13, color: P.textSec, fontWeight: 500 }}>⏱ {recipe.time}</div>}
               </div>
 
               <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 10 }}>Zutaten</div>
               <div style={{ marginBottom: 20 }}>
-                {currentRecipe.ingredients?.map((ing, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < currentRecipe.ingredients.length - 1 ? `1px solid ${P.border}` : "none" }}>
+                {recipe.ingredients?.map((ing, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < recipe.ingredients.length - 1 ? `1px solid ${P.border}` : "none" }}>
                     <div style={{ width: 6, height: 6, borderRadius: 3, background: P.green, flexShrink: 0 }} />
                     <span style={{ fontSize: 14 }}>{ing}</span>
                   </div>
@@ -469,29 +493,70 @@ export default function App() {
               </div>
 
               <div style={{ fontSize: 13, fontWeight: 700, color: P.textTer, marginBottom: 10 }}>Zubereitung</div>
-              {currentRecipe.steps?.map((s, i) => (
+              {recipe.steps?.map((s, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                   <div style={{ width: 28, height: 28, borderRadius: 14, background: P.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: P.textSec, flexShrink: 0 }}>{i + 1}</div>
                   <div style={{ fontSize: 14, color: P.text, lineHeight: 1.6, paddingTop: 3 }}>{s}</div>
                 </div>
               ))}
 
-              {currentRecipe.tip && (
+              {recipe.tip && (
                 <div style={{ background: P.amberBg, borderRadius: 12, padding: 14, border: `1px solid ${P.amberBd}`, marginTop: 8 }}>
-                  <div style={{ fontSize: 13, color: P.text, lineHeight: 1.5 }}>💡 {currentRecipe.tip}</div>
+                  <div style={{ fontSize: 13, color: P.text, lineHeight: 1.5 }}>💡 {recipe.tip}</div>
                 </div>
               )}
             </Card>
 
-            {/* More recipes CTA */}
-            {recipes.length < 3 && (
-              <Btn variant="magic" onClick={loadMoreRecipes} disabled={loadingMore} style={{ marginBottom: 8 }}>
-                {loadingMore ? "Wird geladen…" : "Mehr Rezepte anzeigen 🪄"}
-              </Btn>
+            {/* Edit Recipe */}
+            {!editMode ? (
+              <Btn variant="secondary" onClick={() => setEditMode(true)} style={{ marginBottom: 16, border: `1.5px solid ${P.border}` }}>Rezept anpassen ✏️</Btn>
+            ) : (
+              <Card style={{ marginBottom: 16, border: `1.5px solid ${P.greenBd}` }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Rezept anpassen</div>
+                <div style={{ fontSize: 13, color: P.textSec, marginBottom: 12, lineHeight: 1.4 }}>Beschreib, was du ändern möchtest.</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  {["Für 4 Personen", "Ohne Milch", "Schneller", "Mit Kartoffeln", "Weniger Zutaten"].map((s, i) => (
+                    <button key={i} onClick={() => setEditInput(s)} style={{
+                      fontSize: 12, fontWeight: 500, background: P.greenBg, border: `1px solid ${P.greenBd}`,
+                      color: P.green, padding: "6px 12px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit",
+                    }}>{s}</button>
+                  ))}
+                </div>
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <input value={editInput} onChange={e => setEditInput(e.target.value)} placeholder="z.B. Geht das auch mit Reis?"
+                    onKeyDown={e => e.key === "Enter" && editInput.trim() && editRecipe()}
+                    style={{ width: "100%", background: P.surfaceAlt, border: `1.5px solid ${P.border}`, borderRadius: P.radiusSm, padding: "14px", paddingRight: 50, color: P.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box" }} />
+                  {editInput && (
+                    <button onClick={() => setEditInput("")} style={{
+                      position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                      width: 28, height: 28, borderRadius: 14, border: "none", background: P.border,
+                      color: P.textSec, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>✕</button>
+                  )}
+                </div>
+                <Btn variant="magic" onClick={editRecipe} disabled={!editInput.trim() || editLoading}>
+                  {editLoading ? "Wird angepasst…" : "Anpassen 🪄"}
+                </Btn>
+                <button onClick={() => { setEditMode(false); setEditInput(""); }} style={{
+                  width: "100%", padding: "12px", background: "none", border: "none",
+                  color: P.textTer, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", marginTop: 4,
+                }}>Abbrechen</button>
+              </Card>
             )}
 
-            {result && <Btn variant="secondary" onClick={() => { setStep("result"); setRecipes([]); setRecipeIdx(0); setError(null); }} style={{ marginBottom: 8 }}>← Zurück zum Check</Btn>}
-            <Btn variant="secondary" onClick={reset}>Neuer Check</Btn>
+            {/* Navigation links */}
+            <div style={{ textAlign: "center", marginTop: 8 }}>
+              {result && (
+                <button onClick={() => { setStep("result"); setRecipe(null); setEditMode(false); setError(null); }} style={{
+                  background: "none", border: "none", color: P.textTer, fontSize: 14, fontWeight: 500,
+                  cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", marginRight: 16,
+                }}>← Zurück zum Check</button>
+              )}
+              <button onClick={reset} style={{
+                background: "none", border: "none", color: P.textTer, fontSize: 14, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit", textDecoration: "underline",
+              }}>Neuer Check</button>
+            </div>
           </div>
         )}
       </div>
