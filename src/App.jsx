@@ -23,8 +23,8 @@ const categoryLabel = c => {
 
 const MODEL = "claude-haiku-4-5-20251001";
 const SYS = "Du bist ein strenger aber freundlicher FODMAP-Ernährungsberater nach Monash-Universität-Richtlinien. WICHTIG: Sei bei der Einstufung STRENG und KORREKT. Knoblauch, Zwiebeln, Weizen, Honig, Äpfel, Birnen, Wassermelone, Pilze, Blumenkohl sind IMMER high-FODMAP. Laktose-haltige Milchprodukte sind moderate bis high. Wenn auch nur EINE Zutat high-FODMAP ist, muss overall mindestens moderate sein. Antworte immer auf Deutsch. Schreib verständlich für Laien, keine Fachbegriffe.";
-const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). WICHTIG: Liste NUR Zutaten auf die der User auch eingegeben hat oder die offensichtlich Teil des Gerichts sind. Erfinde KEINE Zutaten dazu. NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"1 kurzer ermutigender Satz, linksbündig geeignet. Bei high: was ist das Hauptproblem? Bei low: kurze Bestätigung.","takeaway":"1 Satz den sich der User merken soll — die wichtigste Erkenntnis aus diesem Check. Beginne mit einem Verb.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 6 Wörter, kein Satzzeichen am Ende","alternative":"Kurze verträgliche Alternative oder null"}]}`;
-const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. WICHTIG: Erfinde KEINE Zutaten die nicht in der Liste stehen. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"1 kurzer Satz.","takeaway":"1 Satz den sich der User merken soll. Beginne mit einem Verb.","items":[{"name":"Zutat","fodmap":"low/moderate/high","category":"Fructose/Lactose/Fructane/GOS/Polyole/keine","detail":"Maximal 6 Wörter","alternative":"null oder kurze Alternative"}]}`;
+const PROMPT_CHECK = `Analysiere das Essen auf FODMAP-Verträglichkeit (Monash-basiert). WICHTIG: Liste NUR Zutaten auf die der User eingegeben hat oder die offensichtlich Teil des Gerichts sind. Erfinde KEINE Zutaten. Erkläre JEDE problematische Zutat so dass ein Laie es sofort versteht - keine Fachbegriffe wie Fructane, GOS, Polyole. Sag stattdessen was es im Körper macht. NUR JSON:\n{"title":"Name des Gerichts","overall":"low/moderate/high","summary":"1 kurzer ermutigender Satz. Bei high: was ist das Hauptproblem und dass es eine Lösung gibt. Bei low: kurze Bestätigung. Optional ein konkreter Tipp.","items":[{"name":"Zutat (einfacher Name ohne Klammerzusatz)","fodmap":"low/moderate/high","why":"1 klarer Satz OHNE Fachbegriffe: Warum ist das problematisch ODER warum ist es okay? Erkläre was im Körper passiert.","swap":"Kurze verträgliche Alternative oder null"}]}`;
+const PROMPT_LABEL = `Analysiere diese Zutatenliste auf FODMAP-Verträglichkeit. WICHTIG: Erfinde KEINE Zutaten. Keine Fachbegriffe. Erkläre verständlich was im Körper passiert. NUR JSON:\n{"title":"Produktname","overall":"low/moderate/high","summary":"1 kurzer Satz mit optionalem Tipp.","items":[{"name":"Zutat","fodmap":"low/moderate/high","why":"1 klarer Satz ohne Fachbegriffe.","swap":"null oder kurze Alternative"}]}`;
 const PROMPT_RECIPE = `Erstelle EIN leckeres einfaches Rezept passend zum Gericht. Falls Zutaten problematisch sind, ersetze sie. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname (z.B. Cremige Knoblauch-Pasta)","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 const PROMPT_HUNGER = `Erstelle EIN leckeres einfaches FODMAP-armes Rezept basierend auf dem Wunsch. Sei kreativ! Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
 const PROMPT_EDIT = `Du hast ein Rezept erstellt. Der Nutzer möchte es anpassen. Erstelle die angepasste Version. Einfache Sprache. NUR JSON:\n{"title":"Kreativer Rezeptname","description":"1 appetitlicher Satz","servings":2,"time":"z.B. 25 Min.","ingredients":["Zutat 1","Zutat 2"],"steps":["Schritt 1","Schritt 2"],"tip":"Praktischer Tipp"}`;
@@ -144,7 +144,6 @@ function ChipInput({ value, onChange, placeholder, suggestions }) {
 function IngredientRow({ it, last }) {
   const [open, setOpen] = useState(false);
   const isOk = it.fodmap === "low";
-  const catLabel = categoryLabel(it.category);
   return (
     <div style={{ borderBottom: last ? "none" : `1px solid ${B.lightGray}` }}>
       <button onClick={() => !isOk && setOpen(!open)} style={{
@@ -157,13 +156,12 @@ function IngredientRow({ it, last }) {
         {isOk && <span style={{ fontSize: 13, color: B.ok }}>✓</span>}
       </button>
       {open && !isOk && (
-        <div style={{ padding: "0 0 13px 22px", animation: "fadeUp .2s ease-out" }}>
-          {catLabel && <div style={{ display: "inline-block", fontSize: 12, fontWeight: 600, background: bgOf(it.fodmap), color: colorOf(it.fodmap), padding: "3px 10px", borderRadius: 6, marginBottom: 8 }}>{catLabel}</div>}
-          {it.detail && <div style={{ fontSize: 13, color: B.warmGray, lineHeight: 1.5, marginBottom: it.alternative ? 8 : 0 }}>{it.detail}</div>}
-          {it.alternative && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: B.sage, borderRadius: 8, padding: "8px 12px" }}>
-              <span style={{ fontSize: 13, color: B.teal }}>→</span>
-              <span style={{ fontSize: 13, fontWeight: 500, color: B.teal }}>Stattdessen: {it.alternative}</span>
+        <div style={{ padding: "0 0 14px 22px", animation: "fadeUp .2s ease-out", textAlign: "left" }}>
+          {it.why && <div style={{ fontSize: 14, color: B.charcoal, lineHeight: 1.6, marginBottom: it.swap ? 10 : 0 }}>{it.why}</div>}
+          {it.swap && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: B.sage, borderRadius: 8, padding: "7px 12px", marginTop: 2 }}>
+              <span style={{ fontSize: 14, color: B.teal }}>→</span>
+              <span style={{ fontSize: 14, color: B.teal, fontWeight: 500 }}>{it.swap}</span>
             </div>
           )}
         </div>
@@ -435,7 +433,7 @@ export default function App() {
             {productInfo && (
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                 {productInfo.image && <img src={productInfo.image} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />}
-                <div>
+                <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{productInfo.name}</div>
                   {productInfo.nutri && <div style={{ fontSize: 13, color: B.warmGray }}>{productInfo.nutri}</div>}
                 </div>
@@ -447,30 +445,22 @@ export default function App() {
               </div>
             )}
 
-            {/* Verdict Card */}
-            <Card style={{ marginBottom: 12, borderLeft: `4px solid ${colorOf(result.overall)}` }}>
-              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 12, textAlign: "left" }}>{result.title}</div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: bgOf(result.overall), padding: "7px 14px", borderRadius: 100, marginBottom: result.summary ? 12 : 0 }}>
+            {/* Verdict */}
+            <Card style={{ marginBottom: 12, borderLeft: `4px solid ${colorOf(result.overall)}`, textAlign: "left" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: bgOf(result.overall), padding: "6px 12px", borderRadius: 100, marginBottom: 14 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 4, background: colorOf(result.overall) }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: colorOf(result.overall) }}>
                   {result.overall === "low" ? "Verträglich" : result.overall === "moderate" ? "Vorsicht" : "Nicht verträglich"}
                 </span>
               </div>
-              {result.summary && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.6, textAlign: "left" }}>{result.summary}</div>}
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -.5, marginBottom: 10 }}>{result.title}</div>
+              {result.summary && <div style={{ fontSize: 15, color: B.warmGray, lineHeight: 1.6 }}>{result.summary}</div>}
             </Card>
 
-            {/* Takeaway */}
-            {result.takeaway && (
-              <div style={{ background: B.sage, borderRadius: B.radius, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>💡</span>
-                <div style={{ fontSize: 15, fontWeight: 600, color: B.teal, lineHeight: 1.5, textAlign: "left" }}>{result.takeaway}</div>
-              </div>
-            )}
-
             {/* Ingredients */}
-            <Card style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: B.warmGray, textAlign: "left" }}>Zutaten</span>
+            <Card style={{ marginBottom: 16, textAlign: "left" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: B.warmGray }}>Zutaten</span>
                 <span style={{ fontSize: 12, color: B.warmGray }}>Tippe für Details</span>
               </div>
               {result.items?.map((it, i) => <IngredientRow key={i} it={it} last={i === result.items.length - 1} />)}
